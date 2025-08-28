@@ -4,7 +4,7 @@ import './App.css';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Events from './pages/Events';
-import Work from './pages/Work';
+
 import Roles from './pages/Roles';
 import Join from './pages/Join';
 
@@ -16,7 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/events" element={<Events />} />
-          <Route path="/work" element={<Work />} />
+          
           <Route path="/roles" element={<Roles />} />
           <Route path="/join" element={<Join />} />
         </Routes>
