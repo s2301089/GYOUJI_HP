@@ -1,30 +1,19 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 import Header from './components/Header';
 import Home from './pages/Home';
-import Events from './pages/Events';
-
-import Roles from './pages/Roles';
-import Join from './pages/Join';
+import ScrollToTopButton from './components/ScrollToTopButton';
 
 function App() {
   return (
-    <Router>
-      <div className="App">
-        <Header />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/events" element={<Events />} />
-          
-          <Route path="/roles" element={<Roles />} />
-          <Route path="/join" element={<Join />} />
-        </Routes>
-        <footer className="App-footer">
-          <p>&copy; 2025 仙台高専広瀬キャンパス 行事委員会</p>
-        </footer>
-      </div>
-    </Router>
+    <div className="App">
+      <Header />
+      <Home />
+      <ScrollToTopButton />
+      <footer className="App-footer">
+        <p>&copy; 2025 仙台高専広瀬キャンパス 行事委員会</p>
+      </footer>
+    </div>
   );
 }
 

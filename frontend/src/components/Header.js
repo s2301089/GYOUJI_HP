@@ -1,20 +1,33 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
 import './Header.css';
 
 const Header = () => {
+  const handleScroll = (e, targetId) => {
+    e.preventDefault();
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      const headerOffset = 80; // Adjust this value to match your header's height
+      const elementPosition = targetElement.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
     <header className="main-header">
       <div className="logo">
-        <NavLink to="/">行事委員会</NavLink>
+        <a href="#home" onClick={(e) => handleScroll(e, 'home')}>行事委員会</a>
       </div>
       <nav>
         <ul>
-          <li><NavLink to="/">ホーム</NavLink></li>
-          <li><NavLink to="/events">主なイベント</NavLink></li>
-          
-          <li><NavLink to="/roles">役職紹介</NavLink></li>
-          <li><NavLink to="/join">参加方法</NavLink></li>
+          <li><a href="#home" onClick={(e) => handleScroll(e, 'home')}>ホーム</a></li>
+          <li><a href="#events" onClick={(e) => handleScroll(e, 'events')}>主なイベント</a></li>
+          <li><a href="#roles" onClick={(e) => handleScroll(e, 'roles')}>役職紹介</a></li>
+          <li><a href="#join" onClick={(e) => handleScroll(e, 'join')}>参加方法</a></li>
         </ul>
       </nav>
     </header>
