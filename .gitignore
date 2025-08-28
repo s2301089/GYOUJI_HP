@@ -1,0 +1,37 @@
+# ---- Node / React ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
+# build 出力
+build/
+dist/
+
+# IDE / エディタ
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 環境変数ファイル
+.env
+.env.*.local
+
+# ---- Docker ----
+# キャッシュや不要ファイル
+.docker/
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- その他 ----
+coverage/
+*.log
