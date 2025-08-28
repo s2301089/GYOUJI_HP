@@ -1,38 +1,84 @@
+/* General Styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  background-color: #FFFFFF;
+  color: #000000;
+}
+
 .App {
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
+/* App Header (on Home page) */
 .App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  background: none;
+  color: #000000;
+  padding: 4rem 2rem;
 }
 
-.App-link {
-  color: #61dafb;
+.App-header h1 {
+  font-size: 2.5rem;
+  margin: 0;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.App-header p {
+  font-size: 1.2rem;
+  color: #000000;
+}
+
+/* Main Content */
+main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.App-section {
+  background-color: #FFFFFF;
+  margin-bottom: 2rem;
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid #000000;
+  text-align: left;
+}
+
+.App-section h2 {
+  font-size: 2rem;
+  color: #4B0082;
+  border-bottom: 1px solid #4B0082;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Lists */
+.App-section ul, .App-section ol {
+  padding-left: 20px;
+}
+
+.App-section ul li, .App-section ol li {
+  margin-bottom: 0.8rem;
+  line-height: 1.6;
+}
+
+.App-section ol li strong {
+  color: #4B0082;
+}
+
+/* Join Section */
+#join p {
+  line-height: 1.8;
+}
+
+/* Footer */
+.App-footer {
+  background-color: #FFFFFF;
+  color: #000000;
+  padding: 1.5rem;
+  margin-top: 2rem;
+  border-top: 1px solid #000000;
 }
