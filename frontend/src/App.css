@@ -75,10 +75,38 @@ main {
 }
 
 /* Footer */
+
 .App-footer {
   background-color: #FFFFFF;
   color: #000000;
   padding: 1.5rem;
   margin-top: 2rem;
   border-top: 1px solid #000000;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .App-header {
+    padding: 2rem 1rem;
+  }
+
+  .App-header h1 {
+    font-size: 2rem;
+  }
+
+  .App-header p {
+    font-size: 1rem;
+  }
+
+  main {
+    padding: 1rem;
+  }
+
+  .App-section {
+    padding: 1.5rem;
+  }
+
+  .App-section h2 {
+    font-size: 1.5rem;
+  }
 }
