@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package.json. A package-lock.json is highly recommended for reproducible builds.
-COPY package.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm install
