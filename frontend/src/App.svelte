@@ -22,7 +22,10 @@
   <!-- Header -->
   <header>
     <div class="container header-content">
-      <h1>行事委員会</h1>
+      <div class="header-title-group">
+        <img src="/icon.svg" alt="行事委員会 Icon" class="header-icon" />
+        <h1>行事委員会</h1>
+      </div>
       <nav class="desktop-nav">
         <button on:click={() => scrollToSection('home')}>ホーム</button>
         <button on:click={() => scrollToSection('about')}>概要</button>
@@ -174,6 +177,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .header-icon {
+    height:5rem;
   }
 
   header h1 {
