@@ -15,6 +15,8 @@ backend/
 │   │   └── user_service.go
 │   ├── repository/        # DBアクセス (SQL/ORM)
 │   │   └── user_repository.go
+│   ├── middleware/        # ミドルウェア
+│   │   └── auth_middleware.go
 │   ├── model/             # モデル（構造体定義）
 │   │   └── user.go
 │   └── router/            # ルーティング設定

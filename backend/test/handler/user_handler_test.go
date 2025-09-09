@@ -7,9 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/handler"
+	"github.com/saku0512/GYOUJI_HP/backend/internal/router"
+	"github.com/saku0512/GYOUJI_HP/backend/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -119,6 +123,82 @@ func TestUserHandler_Login(t *testing.T) {
 			if tc.expectedStatus != http.StatusBadRequest {
 				mockService.AssertExpectations(t)
 			}
+		})
+	}
+}
+
+func TestUserHandler_Logout(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const jwtSecret = "test_secret_key"
+
+	// テスト用の有効なJWTを生成
+	claims := &service.Claims{
+		UserID:   1,
+		Username: "testuser",
+		Role:     "student",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	validToken, _ := token.SignedString([]byte(jwtSecret))
+
+	testCases := []struct {
+		name           string
+		authHeader     string // Authorizationヘッダーの値
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "正常系: ログアウト成功",
+			authHeader:     "Bearer " + validToken,
+			expectedStatus: http.StatusOK,
+			expectedBody:   `{"message":"Logout successful"}`,
+		},
+		{
+			name:           "異常系: Authorizationヘッダーなし",
+			authHeader:     "",
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Authorization header is required"}`,
+		},
+		{
+			name:           "異常系: Bearerプレフィックスなし",
+			authHeader:     validToken,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Authorization header format must be Bearer {token}"}`,
+		},
+		{
+			name:           "異常系: 不正なトークン",
+			authHeader:     "Bearer invalid.token",
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Invalid or expired token"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// --- セットアップ ---
+			// ログアウトハンドラはServiceを呼ばないので、モックは不要
+			mockService := new(MockUserService)
+			userHandler := handler.NewUserHandler(mockService)
+
+			// ルーターをセットアップ（ミドルウェアを有効にするためjwtSecretを渡す）
+			r := router.SetupRouter(userHandler, jwtSecret)
+
+			// HTTPリクエストをシミュレート
+			req, _ := http.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+			if tc.authHeader != "" {
+				req.Header.Set("Authorization", tc.authHeader)
+			}
+
+			w := httptest.NewRecorder()
+
+			// --- 実行 ---
+			r.ServeHTTP(w, req)
+
+			// --- 検証 ---
+			assert.Equal(t, tc.expectedStatus, w.Code)
+			assert.JSONEq(t, tc.expectedBody, w.Body.String())
 		})
 	}
 }

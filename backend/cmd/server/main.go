@@ -51,7 +51,7 @@ func main() {
 	userService := service.NewUserService(userRepository, jwtSecret)
 	userHandler := handler.NewUserHandler(userService)
 
-	r := router.SetupRouter(userHandler)
+	r := router.SetupRouter(userHandler, jwtSecret)
 	log.Println("Server is running on port 8080")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("failed to run server: %v", err)
