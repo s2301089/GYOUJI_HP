@@ -6,8 +6,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/saku0512/GYOUJI_HP/backend/internal/handler"
+	"github.com/saku0512/GYOUJI_HP/backend/internal/repository"
+	"github.com/saku0512/GYOUJI_HP/backend/internal/router"
+	"github.com/saku0512/GYOUJI_HP/backend/internal/service"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -38,11 +41,21 @@ func main() {
 	// Initialize users
 	initializeUsers(db)
 
-	r := gin.Default()
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "Hello, Gin!"})
-	})
-	r.Run(":8080")
+	jwtSecret := os.Getenv("JWT_SECRET_KEY")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET_KEY is not set")
+	}
+
+	// Repository -> Service -> Handler の順でインスタンスを生成
+	userRepository := repository.NewUserRepository(db)
+	userService := service.NewUserService(userRepository, jwtSecret)
+	userHandler := handler.NewUserHandler(userService)
+
+	r := router.SetupRouter(userHandler)
+	log.Println("Server is running on port 8080")
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("failed to run server: %v", err)
+	}
 }
 
 func initializeUsers(db *sql.DB) {
