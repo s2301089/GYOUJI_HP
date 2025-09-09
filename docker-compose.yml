@@ -51,10 +51,48 @@ services:
 
       # サービス設定（変更なし）
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      # --- ↑ここまで追加・変更↑ ---
     networks:
       - web
+
+  backend:
+    build: ./backend
+    container_name: gyouji-hp-backend
+    env_file:
+      - .env
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=local3300"
+      - "traefik.http.services.backend.loadbalancer.server.port=8080"
+    networks:
+      - web
+
+  db:
+    image: mysql:8.0
+    container_name: gyouji-hp-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./backend/db/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - web
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   web:
     driver: bridge
+
+volumes:
+  db-data:
