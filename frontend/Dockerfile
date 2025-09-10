@@ -19,7 +19,10 @@ RUN npm run build
 FROM nginx:1.25-alpine
 
 # Copy the built static files from the builder stage to the Nginx html directory
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Copy the custom Nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Nginx exposes port 80 by default, which is what Traefik is configured to connect to.
 # No EXPOSE needed here as it's documentation.
