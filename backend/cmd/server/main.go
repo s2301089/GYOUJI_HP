@@ -51,12 +51,17 @@ func main() {
 		log.Fatal("JWT_SECRET_KEY is not set")
 	}
 
-	// Repository -> Service -> Handler の順でインスタンスを生成
+	// User用DI
 	userRepository := repository.NewUserRepository(db)
 	userService := service.NewUserService(userRepository, jwtSecret)
 	userHandler := handler.NewUserHandler(userService)
 
-	r := router.SetupRouter(userHandler, jwtSecret)
+	// Tournament用DI
+	tournamentRepository := repository.NewTournamentRepository(db)
+	tournamentService := service.NewTournamentService(tournamentRepository)
+	tournamentHandler := handler.NewTournamentHandler(tournamentService)
+
+	r := router.SetupRouter(userHandler, tournamentHandler, jwtSecret)
 	log.Println("Server is running on port 8080")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("failed to run server: %v", err)

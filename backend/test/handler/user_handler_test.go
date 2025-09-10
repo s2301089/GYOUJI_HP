@@ -1,4 +1,4 @@
-package test
+package handler_test
 
 import (
 	"bytes"
@@ -183,7 +183,7 @@ func TestUserHandler_Logout(t *testing.T) {
 			userHandler := handler.NewUserHandler(mockService)
 
 			// ルーターをセットアップ（ミドルウェアを有効にするためjwtSecretを渡す）
-			r := router.SetupRouter(userHandler, jwtSecret)
+			r := router.SetupRouter(userHandler, nil, jwtSecret)
 
 			// HTTPリクエストをシミュレート
 			req, _ := http.NewRequest(http.MethodPost, "/api/auth/logout", nil)

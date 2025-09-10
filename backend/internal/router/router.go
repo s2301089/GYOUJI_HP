@@ -12,7 +12,7 @@ import (
 )
 
 // SetupRouter は Gin のルーターをセットアップし、ルートを定義します。
-func SetupRouter(userHandler *handler.UserHandler, jwtSecret string) *gin.Engine {
+func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.TournamentHandler, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 
 	// CORSミドルウェアの設定（開発用に寛容な設定）
@@ -35,19 +35,28 @@ func SetupRouter(userHandler *handler.UserHandler, jwtSecret string) *gin.Engine
 
 	api := r.Group("/api")
 	{
+		// --- 認証が不要なルート ---
+		api.GET("/tournaments/:sport", tournamentHandler.GetTournamentsBySport)
+
+		// --- 認証関連のルートグループ ---
 		auth := api.Group("/auth")
 		{
+			// ログインは認証不要
 			auth.POST("/login", userHandler.Login)
+
+			// ログアウトは認証必須
+			auth.Use(middleware.AuthMiddleware(jwtSecret))
+			{
+				auth.POST("/logout", userHandler.Logout)
+			}
 		}
 
-		// --- 認証が必要なルートグループ ---
-		authRequired := api.Group("/")
-		// このグループのルートは、すべてAuthMiddlewareを通過する必要がある
-		authRequired.Use(middleware.AuthMiddleware(jwtSecret))
-		{
-			authRequired.POST("/auth/logout", userHandler.Logout)
-			// 今後、ユーザー情報の取得など、認証が必要なAPIはここに追加します
-		}
+		// 今後、ユーザー情報の取得など、認証が必要なAPIは以下のようなグループに追加します
+		// protected := api.Group("/protected")
+		// protected.Use(middleware.AuthMiddleware(jwtSecret))
+		// {
+		// 	// protected.GET("/users/me", ...)
+		// }
 	}
 
 	return r
