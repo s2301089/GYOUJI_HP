@@ -5,6 +5,10 @@ import (
 	"github.com/saku0512/GYOUJI_HP/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "github.com/saku0512/GYOUJI_HP/backend/docs"
 )
 
 // SetupRouter は Gin のルーターをセットアップし、ルートを定義します。
@@ -16,7 +20,7 @@ func SetupRouter(userHandler *handler.UserHandler, jwtSecret string) *gin.Engine
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Writer.Header().Set("Access-control-allow-methods", "POST, OPTIONS, GET, PUT, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -25,6 +29,9 @@ func SetupRouter(userHandler *handler.UserHandler, jwtSecret string) *gin.Engine
 
 		c.Next()
 	})
+
+	// Swagger UI
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := r.Group("/api")
 	{

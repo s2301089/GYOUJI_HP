@@ -1,3 +1,8 @@
+// @title GYOUJI_HP API
+// @version 1.0
+// @description This is a sample server for GYOUJI_HP.
+// @host localhost:8080
+// @BasePath /
 package main
 
 import (

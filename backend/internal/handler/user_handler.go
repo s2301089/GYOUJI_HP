@@ -51,6 +51,14 @@ func (h *UserHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
+// Logout godoc
+// @Summary Logout a user
+// @Description Invalidate the user's session.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /auth/logout [post]
 func (h *UserHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
