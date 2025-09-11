@@ -69,7 +69,12 @@ func main() {
 	tournamentService := service.NewTournamentService(tournamentRepository)
 	tournamentHandler := handler.NewTournamentHandler(tournamentService)
 
-	r := router.SetupRouter(userHandler, tournamentHandler, jwtSecret)
+	// Match用DI
+	matchRepository := repository.NewMatchRepository(db)
+	matchService := service.NewMatchService(matchRepository)
+	matchHandler := handler.NewMatchHandler(matchService)
+
+	r := router.SetupRouter(userHandler, tournamentHandler, matchHandler, jwtSecret)
 	log.Println("Server is running on port 8080")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("failed to run server: %v", err)

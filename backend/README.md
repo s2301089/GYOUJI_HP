@@ -105,8 +105,11 @@ backend/
 - **リクエストボディ:**
   ```json
   {
+    "user": "更新者",
     "team1_score": 2,
-    "team2_score": 1
+    "team2_score": 1,
+    "winner_team_id": 1,
+    "status": "finished"
   }
   ```
 - **レスポンス:**
