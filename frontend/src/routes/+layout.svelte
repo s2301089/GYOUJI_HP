@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import '../app.css';
+  import { page } from '$app/stores';
+  import { derived } from 'svelte/store';
 
   let isMobileMenuOpen = false;
 
@@ -8,9 +10,6 @@
     isMobileMenuOpen = !isMobileMenuOpen;
   };
 
-  // SvelteKit doesn't have the same anchor scrolling behavior by default on client-side navigation.
-  // The scrollToSection logic is more complex in SvelteKit if we want it to work for anchors
-  // on different pages. For now, we'll keep it simple for same-page anchors.
   const scrollToSection = (id) => {
     const element = document.getElementById(id);
     if (element) {
@@ -23,44 +22,47 @@
     scrollToSection(id);
   };
 
-  // The onMount logic for hash scrolling is generally handled by SvelteKit, but can be added if needed.
+  // ダッシュボード配下か判定
+  const isDashboard = derived(page, $page => $page.url.pathname.startsWith('/dashboard'));
 </script>
 
 <div class="app-container">
-  <!-- Header -->
-  <header>
-    <div class="container header-content">
-      <div class="header-title-group">
-        <a href="/">
-          <img src="/icon.svg" alt="行事委員会 Icon" class="header-icon" />
-          <h1>行事委員会</h1>
-        </a>
+  {#if !$isDashboard}
+    <!-- Header -->
+    <header>
+      <div class="container header-content">
+        <div class="header-title-group">
+          <a href="/">
+            <img src="/icon.svg" alt="行事委員会 Icon" class="header-icon" />
+            <h1>行事委員会</h1>
+          </a>
+        </div>
+        <nav class="desktop-nav">
+          <a href="/#home">ホーム</a>
+          <a href="/#about">概要</a>
+          <a href="/#events">イベント</a>
+          <a href="/#roles">役職</a>
+          <a href="/#join">参加方法</a>
+        </nav>
+        <button class="hamburger-menu" on:click={toggleMobileMenu} aria-label="メニューを開閉する">
+          <span class="line"></span>
+          <span class="line"></span>
+          <span class="line"></span>
+        </button>
       </div>
-      <nav class="desktop-nav">
-        <a href="/#home">ホーム</a>
-        <a href="/#about">概要</a>
-        <a href="/#events">イベント</a>
-        <a href="/#roles">役職</a>
-        <a href="/#join">参加方法</a>
-      </nav>
-      <button class="hamburger-menu" on:click={toggleMobileMenu} aria-label="メニューを開閉する">
-        <span class="line"></span>
-        <span class="line"></span>
-        <span class="line"></span>
-      </button>
-    </div>
-  </header>
+    </header>
 
-  {#if isMobileMenuOpen}
-    <div class="mobile-nav-container" on:click={toggleMobileMenu}>
-      <nav on:click|stopPropagation>
-        <a href="/#home" on:click={() => closeMenuAndScroll('home')}>ホーム</a>
-        <a href="/#about" on:click={() => closeMenuAndScroll('about')}>概要</a>
-        <a href="/#events" on:click={() => closeMenuAndScroll('events')}>イベント</a>
-        <a href="/#roles" on:click={() => closeMenuAndScroll('roles')}>役職</a>
-        <a href="/#join" on:click={() => closeMenuAndScroll('join')}>参加方法</a>
-      </nav>
-    </div>
+    {#if isMobileMenuOpen}
+      <div class="mobile-nav-container" on:click={toggleMobileMenu}>
+        <nav on:click|stopPropagation>
+          <a href="/#home" on:click={() => closeMenuAndScroll('home')}>ホーム</a>
+          <a href="/#about" on:click={() => closeMenuAndScroll('about')}>概要</a>
+          <a href="/#events" on:click={() => closeMenuAndScroll('events')}>イベント</a>
+          <a href="/#roles" on:click={() => closeMenuAndScroll('roles')}>役職</a>
+          <a href="/#join" on:click={() => closeMenuAndScroll('join')}>参加方法</a>
+        </nav>
+      </div>
+    {/if}
   {/if}
 
   <main>

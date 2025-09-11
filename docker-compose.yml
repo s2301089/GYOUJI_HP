@@ -80,6 +80,7 @@ services:
     volumes:
       - db-data:/var/lib/mysql
       - ./backend/db/migrations:/docker-entrypoint-initdb.d
+      - ./backend/db/conf.d:/etc/mysql/conf.d
     networks:
       - web
     ports:

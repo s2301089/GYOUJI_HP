@@ -1,7 +1,7 @@
 // @title GYOUJI_HP API
 // @version 1.0
 // @description This is a sample server for GYOUJI_HP.
-// @host localhost:8080
+// @host localhost:3300
 // @BasePath /
 package main
 
@@ -11,7 +11,7 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/handler"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/repository"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/router"
@@ -23,15 +23,23 @@ import (
 func main() {
 	log.Println("Starting the application...")
 	// Database connection
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_ROOT_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_DATABASE"),
-	)
+	cfg := mysql.Config{
+		User:                 os.Getenv("DB_USER"),
+		Passwd:               os.Getenv("DB_ROOT_PASSWORD"),
+		Net:                  "tcp",
+		Addr:                 fmt.Sprintf("%s:%s", os.Getenv("DB_HOST"), os.Getenv("DB_PORT")),
+		DBName:               os.Getenv("DB_DATABASE"),
+		AllowNativePasswords: true, // MySQL 8.0以上で推奨
+		ParseTime:            true,
+		Collation:            "utf8mb4_unicode_ci",
+		// charsetパラメータをParams経由で確実に設定する
+		Params: map[string]string{
+			"charset": "utf8mb4",
+		},
+	}
 
-	db, err := sql.Open("mysql", dsn)
+	// cfg.FormatDSN() で安全なDSN文字列を生成
+	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}

@@ -6,6 +6,16 @@
 - **UIライブラリ:** Tailwind CSS
 - **データ可視化:** Bracketry (トーナメント表の描画に使用)
 
+brackertryの基本的な使い方
+```
+import { createBracket } from 'bracketry'
+
+const wrapper = document.querySelector('#your-wrapper-element')
+const data = { ... } // data of a specific shape
+
+createBracket(data, wrapper)
+```
+
 ## ディレクトリ構成案 (Planned)
 
 ```

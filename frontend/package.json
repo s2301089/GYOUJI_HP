@@ -15,5 +15,8 @@
     "rollup": "^3.29.5",
     "svelte": "^5.38.1",
     "vite": "^7.1.2"
+  },
+  "dependencies": {
+    "bracketry": "^1.1.3"
   }
 }
