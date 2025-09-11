@@ -28,11 +28,11 @@ func NewMatchHandler(s service.MatchServiceInterface) *MatchHandler {
 // @Param        score body      model.TeamScore true  "更新するスコア情報"
 // @Param        Authorization header string true "Bearerトークン"
 // @Success      200  {object}  model.Match "更新後の試合情報"
-// @Failure      400  {object}  gin.H "無効なリクエストです (Invalid match ID or request body)"
-// @Failure      401  {object}  gin.H "認証が必要です (Unauthorized)"
-// @Failure      403  {object}  gin.H "権限がありません (Forbidden)"
-// @Failure      404  {object}  gin.H "試合が見つかりません (Match not found)"
-// @Failure      500  {object}  gin.H "サーバー内部エラー"
+// @Failure      400  {object}  model.ErrorResponse "無効なリクエストです (Invalid match ID or request body)"
+// @Failure      401  {object}  model.ErrorResponse "認証が必要です (Unauthorized)"
+// @Failure      403  {object}  model.ErrorResponse "権限がありません (Forbidden)"
+// @Failure      404  {object}  model.ErrorResponse "試合が見つかりません (Match not found)"
+// @Failure      500  {object}  model.ErrorResponse "サーバー内部エラー"
 // @Router       /api/matches/{id} [put]
 // @Security     ApiKeyAuth
 func (h *MatchHandler) UpdateMatchScore(c *gin.Context) {

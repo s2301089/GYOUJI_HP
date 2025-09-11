@@ -77,3 +77,7 @@ type Match struct {
 	NextMatchID  *int64  `json:"next_match_id"`
 	Status       *string `json:"status"` // Assumed new column in 'matches' table
 }
+
+type ErrorResponse struct {
+	Error string `json:"error" example:"具体的なエラーメッセージ"`
+}
