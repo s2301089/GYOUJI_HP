@@ -12,7 +12,7 @@ import (
 )
 
 // SetupRouter は Gin のルーターをセットアップし、ルートを定義します。
-func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.TournamentHandler, matchHandler *handler.MatchHandler, jwtSecret string) *gin.Engine {
+func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.TournamentHandler, matchHandler *handler.MatchHandler, jwtSecret string, scoreHandler *handler.ScoreHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORSミドルウェアの設定（開発用に寛容な設定）
@@ -37,6 +37,8 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 	{
 		// --- 認証が不要なルート ---
 		api.GET("/tournaments/:sport", tournamentHandler.GetTournamentsBySport)
+		// スコア取得
+		api.GET("/score", scoreHandler.GetScores)
 
 		// --- 認証関連のルートグループ ---
 		auth := api.Group("/auth")
