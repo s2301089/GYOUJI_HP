@@ -16,10 +16,11 @@ type BracketryRound struct {
 
 // BracketryMatch represents a single match.
 type BracketryMatch struct {
-	RoundIndex  int             `json:"roundIndex"`
-	Order       int             `json:"order"`
-	Sides       []BracketrySide `json:"sides"`
-	MatchStatus *string         `json:"matchStatus,omitempty"`
+	RoundIndex    int             `json:"roundIndex"`
+	Order         int             `json:"order"`
+	Sides         []BracketrySide `json:"sides"`
+	MatchStatus   *string         `json:"matchStatus,omitempty"`
+	IsBronzeMatch bool            `json:"isBronzeMatch"`
 }
 
 // BracketrySide represents one side of a match (a player or a BYE).

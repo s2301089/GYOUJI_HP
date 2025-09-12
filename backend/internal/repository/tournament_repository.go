@@ -48,7 +48,13 @@ func (r *TournamentRepository) GetTournamentsBySport(sport string) (interface{},
 		if err != nil {
 			return nil, err
 		}
-		finalBrackets = append(finalBrackets, *bracket)
+		if bracket != nil {
+			finalBrackets = append(finalBrackets, *bracket)
+		}
+	}
+
+	if err := tournamentsRows.Err(); err != nil {
+		return nil, err
 	}
 
 	return finalBrackets, nil
@@ -56,6 +62,9 @@ func (r *TournamentRepository) GetTournamentsBySport(sport string) (interface{},
 
 // transformToBracketryData is the core logic for converting DB data into the Bracketry format.
 func (r *TournamentRepository) transformToBracketryData(tournamentName string, teams []model.Team, matches []model.Match) (*model.BracketryData, error) {
+	if len(matches) == 0 {
+		return nil, nil // 表示する試合がないので、このトーナメントはスキップ
+	}
 	matchesByRound := make(map[int][]model.Match)
 	maxRound := 0
 	for _, m := range matches {
@@ -67,20 +76,42 @@ func (r *TournamentRepository) transformToBracketryData(tournamentName string, t
 
 	var bracketryRounds []model.BracketryRound
 	for i := 1; i <= maxRound; i++ {
-		// You can implement more dynamic naming here (e.g., "Semifinals", "Final")
-		bracketryRounds = append(bracketryRounds, model.BracketryRound{Name: fmt.Sprintf("Round %d", i)})
+		var roundName string
+		// (ラウンド名のロジックはご提示いただいたものをそのまま使用します)
+		if maxRound == 4 {
+			switch i {
+			case 1:
+				roundName = "1st Round"
+			case 2:
+				roundName = "2nd Round"
+			case 3:
+				roundName = "Semifinals"
+			case 4:
+				roundName = "Final"
+			}
+		} else if maxRound == 3 {
+			switch i {
+			case 1:
+				roundName = "1st Round"
+			case 2:
+				roundName = "Semifinals"
+			case 3:
+				roundName = "Final"
+			}
+		} else {
+			roundName = fmt.Sprintf("Round %d", i)
+		}
+		bracketryRounds = append(bracketryRounds, model.BracketryRound{Name: roundName})
 	}
 
 	bracketryContestants := make(map[string]model.BracketryContestant)
-	for _, team := range teams {
-		teamIDStr := strconv.FormatInt(team.ID, 10)
-		bracketryContestants[teamIDStr] = model.BracketryContestant{
-			EntryStatus: team.EntryStatus,
-			Players: []model.Player{
-				{
-					Title: team.Name,
-				},
-			},
+	if len(teams) > 0 {
+		for _, team := range teams {
+			teamIDStr := strconv.FormatInt(team.ID, 10)
+			bracketryContestants[teamIDStr] = model.BracketryContestant{
+				EntryStatus: team.EntryStatus,
+				Players:     []model.Player{{Title: team.Name}},
+			}
 		}
 	}
 
@@ -90,40 +121,54 @@ func (r *TournamentRepository) transformToBracketryData(tournamentName string, t
 			return roundMatches[i].MatchNumber < roundMatches[j].MatchNumber
 		})
 
+		// 3位決定戦が存在するラウンドかどうかのフラグ
+		isFinalRoundWithBronze := (roundNum == maxRound && len(roundMatches) > 1)
+
 		for order, match := range roundMatches {
 			var sides []model.BracketrySide
-
-			// Handle BYE cases or regular matches
+			// (Side作成ロジックは変更ありません)
 			if match.Team1ID != nil && match.Team2ID == nil {
-				// Team 1 has a bye, automatically wins
 				isWinner := true
 				side1 := createSide(match.Team1ID, match.Team1Score, match.Team1ID)
 				side1.IsWinner = &isWinner
-
 				byeTitle := "<div style='margin-left: 60px'>BYE</div>"
 				side2 := model.BracketrySide{Title: &byeTitle}
 				sides = append(sides, side1, side2)
 			} else if match.Team1ID == nil && match.Team2ID != nil {
-				// Team 2 has a bye, automatically wins
 				byeTitle := "<div style='margin-left: 60px'>BYE</div>"
 				side1 := model.BracketrySide{Title: &byeTitle}
-
 				isWinner := true
 				side2 := createSide(match.Team2ID, match.Team2Score, match.Team2ID)
 				side2.IsWinner = &isWinner
 				sides = append(sides, side1, side2)
 			} else {
-				// Regular match with two contestants
 				side1 := createSide(match.Team1ID, match.Team1Score, match.WinnerTeamID)
 				side2 := createSide(match.Team2ID, match.Team2Score, match.WinnerTeamID)
 				sides = append(sides, side1, side2)
 			}
 
+			// ★★★ 修正点2: 3位決定戦のロジックをここに追加 ★★★
+			isBronze := false
+			matchOrder := order // デフォルトの順序
+
+			if isFinalRoundWithBronze {
+				// ソート後の最初の試合（match_numberが小さい方）を3位決定戦とする
+				if order == 0 {
+					isBronze = true
+					matchOrder = 1 // 3位決定戦のorderは1に固定
+				} else { // 2番目の試合（match_numberが大きい方）を決勝戦とする
+					isBronze = false
+					matchOrder = 0 // 決勝戦のorderは0に固定
+				}
+			}
+
 			bracketryMatches = append(bracketryMatches, model.BracketryMatch{
-				RoundIndex:  roundNum - 1, // 0-based index
-				Order:       order,        // 0-based index
+				RoundIndex:  roundNum - 1,
+				Order:       matchOrder, // 調整後のorderを使用
 				Sides:       sides,
 				MatchStatus: match.Status,
+				// ★★★ 修正点3: IsBronzeMatchフィールドを設定 ★★★
+				IsBronzeMatch: isBronze,
 			})
 		}
 	}

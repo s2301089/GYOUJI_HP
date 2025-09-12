@@ -15,4 +15,5 @@ type MatchResponse struct {
 	WinnerTeamID       *int64  `json:"winner_team_id"`
 	Status             *string `json:"status"`
 	NextMatchID        *int64  `json:"next_match_id"`
+	TournamentName     *string `json:"tournament_name,omitempty"`
 }
