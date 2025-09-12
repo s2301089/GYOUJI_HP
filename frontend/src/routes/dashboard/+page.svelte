@@ -32,7 +32,7 @@
 	let selectedSport = '';
 
 	// タブ管理
-	let activeTab = 'tournament'; // 'tournament' or 'input'
+	let activeTab = 'tournament'; // 'tournament' | 'input' | 'scores'
 
 	// ユーザー情報（localStorageのtokenからデコードするか、APIで取得する想定）
 	let userRole = '';
@@ -146,6 +146,29 @@
 	let matchesBySport = {};
 	let matchesLoading = false;
 
+	// スコア一覧
+	let scores = [];
+	let scoresLoading = false;
+
+	async function fetchScores() {
+		scoresLoading = true;
+		const token = localStorage.getItem('token');
+		try {
+			const res = await fetch('/api/score', {
+				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			});
+			if (res.ok) {
+				scores = await res.json();
+			} else {
+				scores = [];
+			}
+		} catch (e) {
+			scores = [];
+		} finally {
+			scoresLoading = false;
+		}
+	}
+
 	// モーダル制御用
 	let showConfirmModal = false;
 	let editingMatch = null;
@@ -232,6 +255,7 @@
 		<button on:click={logout}>ログアウト</button>
 		<nav class="dashboard-tabs">
 			<button class:active={activeTab === 'tournament'} on:click={() => activeTab = 'tournament'}>競技トーナメント</button>
+			<button class:active={activeTab === 'scores'} on:click={async () => { activeTab = 'scores'; await fetchScores(); }}>現在の得点</button>
 			{#if userRole === 'superroot' || userRole === 'admin'}
 				<button class:active={activeTab === 'input'} on:click={async () => {
 					activeTab = 'input';
@@ -287,6 +311,54 @@
 				{#if selectedTournament}
 					<h2>{selectedTournament.name} トーナメント表</h2>
 					<div bind:this={bracketContainer} class="bracket-wrapper"></div>
+				{/if}
+			</div>
+		{/if}
+
+		{#if activeTab === 'scores'}
+			<div class="scores-area">
+				<h2>現在の得点</h2>
+				{#if scoresLoading}
+					<p>読み込み中...</p>
+				{:else}
+					{#if scores.length > 0}
+						<table class="scores-table">
+							<thead>
+								<tr>
+									<th>クラス</th>
+									<th>初期点</th>
+									<th>出席点</th>
+									<th>勝利(+10)</th>
+									<th>決勝 優勝(+80)</th>
+									<th>決勝 準優勝(+60)</th>
+									<th>3位決定 勝者(+50)</th>
+									<th>3位決定 敗者(+40)</th>
+									<th>雨天敗者戦 優勝(+10)</th>
+									<th>合計(初期点除く)</th>
+									<th>合計(初期点含む)</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each scores as s}
+									<tr>
+										<td>{s.class_name}</td>
+										<td>{s.init_score}</td>
+										<td>{s.attendance_score}</td>
+										<td>{s.win_points}</td>
+										<td>{s.final_winner_bonus}</td>
+										<td>{s.final_runnerup_bonus}</td>
+										<td>{s.bronze_winner_bonus}</td>
+										<td>{s.bronze_runnerup_bonus}</td>
+										<td>{s.rainy_loser_champion_bonus}</td>
+										<td><b>{s.total_excluding_init}</b></td>
+										<td><b>{s.total_including_init}</b></td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					{:else}
+						<p>スコアデータがありません。</p>
+					{/if}
 				{/if}
 			</div>
 		{/if}
