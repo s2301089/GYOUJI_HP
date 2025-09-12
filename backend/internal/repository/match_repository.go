@@ -18,7 +18,6 @@ func NewMatchRepository(db *sql.DB) *MatchRepository {
 
 // UpdateMatchScore は試合のスコアを更新し、勝者を次の試合へ進出させます。
 func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Score int, user interface{}) (interface{}, error) {
-	// ユーザー情報の検証
 	userMap, ok := user.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("unauthorized")
@@ -26,46 +25,42 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	role, _ := userMap["role"].(string)
 	assignedSport, _ := userMap["assigned_sport"].(string)
 
-	// データベース操作をトランザクション内で実行
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	// 何か問題が発生した場合はロールバックする
 	defer func() {
 		if p := recover(); p != nil {
 			tx.Rollback()
-			panic(p) // re-throw panic after Rollback
+			panic(p)
 		} else if err != nil {
 			log.Printf("Rolling back transaction due to error: %v", err)
 			tx.Rollback()
 		}
 	}()
 
-	// 試合情報と次の試合IDを取得
-	// next_match_idも一緒に取得
+	// ★★★ 修正点1: loser_next_match_idとトーナメント名も取得する ★★★
 	var tournamentID int
-	var team1ID, team2ID sql.NullInt64 // NULLを許容する型に変更
-	var nextMatchID sql.NullInt64      // NULLを許容する型
-	var matchSport string
+	var team1ID, team2ID, nextMatchID, loserNextMatchID sql.NullInt64
+	var matchSport, tournamentName string
 	var currentRound int
 	query := `
-        SELECT m.tournament_id, m.round, m.team1_id, m.team2_id, m.next_match_id, t.sport
+        SELECT m.tournament_id, m.round, t.name, m.team1_id, m.team2_id, 
+               m.next_match_id, m.loser_next_match_id, t.sport
         FROM matches m JOIN tournaments t ON m.tournament_id = t.id
         WHERE m.id = ?`
-	err = tx.QueryRow(query, matchID).Scan(&tournamentID, &currentRound, &team1ID, &team2ID, &nextMatchID, &matchSport)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("not found")
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to query match: %w", err)
+	err = tx.QueryRow(query, matchID).Scan(&tournamentID, &currentRound, &tournamentName, &team1ID, &team2ID, &nextMatchID, &loserNextMatchID, &matchSport)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("not found")
+		}
+		return nil, fmt.Errorf("failed to query initial match: %w", err)
 	}
 
-	// 権限判定
 	if !(role == "superroot" || (role == "admin" && assignedSport == matchSport)) {
 		return nil, fmt.Errorf("forbidden")
 	}
 
-	// 勝者判定
 	var winnerTeamID, loserTeamID sql.NullInt64
 	if team1Score > team2Score {
 		winnerTeamID = team1ID
@@ -74,93 +69,89 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 		winnerTeamID = team2ID
 		loserTeamID = team1ID
 	}
-	// 引き分けの場合は winnerTeamID は NULL (invalid) のまま
 
-	// 現在の試合のスコアと勝者を更新
-	_, err = tx.Exec(`UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ? `, team1Score, team2Score, winnerTeamID, matchID)
+	// DRY原則に基づき、更新ロジックを関数化
+	err = r.updateMatchAndProgress(tx, matchID, team1Score, team2Score, winnerTeamID, loserTeamID, nextMatchID, loserNextMatchID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update current match: %w", err)
+		return nil, err
 	}
 
-	// 勝者を次の試合に進めるロジックを追加
-	if winnerTeamID.Valid && nextMatchID.Valid {
-		// 次の試合の情報を取得して、どちらのスロットが空いているか確認
-		var nextTeam1ID, nextTeam2ID sql.NullInt64
-		err = tx.QueryRow(`SELECT team1_id, team2_id FROM matches WHERE id = ?`, nextMatchID.Int64).Scan(&nextTeam1ID, &nextTeam2ID)
-		if err != nil {
-			// ここでエラーが発生しても、スコア更新は完了しているためロールバック
-			return nil, fmt.Errorf("failed to query next match: %w", err)
+	// 卓球（晴天時）の場合、雨天時も同期更新するロジック
+	if matchSport == "table_tennis" && tournamentName == "卓球（晴天時）" {
+		var rainyMatchID int
+		var rainyNextMatchID, rainyLoserNextMatchID sql.NullInt64
+
+		rainyQuery := `
+			SELECT m_rainy.id, m_rainy.next_match_id, m_rainy.loser_next_match_id
+			FROM matches m_sunny
+			JOIN tournaments t_rainy ON t_rainy.name = '卓球（雨天時）'
+			JOIN matches m_rainy ON m_rainy.tournament_id = t_rainy.id 
+				AND m_rainy.round = m_sunny.round 
+				AND m_rainy.match_number_in_round = m_sunny.match_number_in_round
+			WHERE m_sunny.id = ?`
+
+		err = tx.QueryRow(rainyQuery, matchID).Scan(&rainyMatchID, &rainyNextMatchID, &rainyLoserNextMatchID)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, fmt.Errorf("failed to find corresponding rainy match: %w", err)
 		}
 
-		// 空いているスロットに勝者IDを設定
-		var updateNextMatchQuery string
-		if !nextTeam1ID.Valid {
-			// team1_idが空いている場合
-			updateNextMatchQuery = `UPDATE matches SET team1_id = ? WHERE id = ?`
-		} else if !nextTeam2ID.Valid {
-			// team2_idが空いている場合
-			updateNextMatchQuery = `UPDATE matches SET team2_id = ? WHERE id = ?`
-		}
-
-		if updateNextMatchQuery != "" {
-			_, err = tx.Exec(updateNextMatchQuery, winnerTeamID.Int64, nextMatchID.Int64)
+		if rainyMatchID != 0 {
+			err = r.updateMatchAndProgress(tx, rainyMatchID, team1Score, team2Score, winnerTeamID, loserTeamID, rainyNextMatchID, rainyLoserNextMatchID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to update next match: %w", err)
+				return nil, fmt.Errorf("failed to sync rainy match: %w", err)
 			}
 		}
 	}
 
-	// 準決勝のみ敗者を三位決定戦にすすめる
-	if loserTeamID.Valid {
-		var maxRound int
-		err = tx.QueryRow(`SELECT MAX(round) FROM matches WHERE tournament_id = ?`, tournamentID).Scan(&maxRound)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get max round for tournament: %w", err)
-		}
-
-		// 現在の試合が準決勝の場合のみ処理
-		if currentRound == maxRound-1 {
-			var thirdPlaceMatchID sql.NullInt64
-			// 3位決定戦を特定 (最終ラウンドで試合番号が一番若い試合と想定)
-			query3rd := `
-                SELECT id FROM matches 
-                WHERE tournament_id = ? AND round = ? 
-                ORDER BY match_number_in_round ASC LIMIT 1`
-			err = tx.QueryRow(query3rd, tournamentID, maxRound).Scan(&thirdPlaceMatchID)
-
-			if err == nil && thirdPlaceMatchID.Valid {
-				var p1, p2 sql.NullInt64
-				err = tx.QueryRow(`SELECT team1_id, team2_id FROM matches WHERE id = ?`, thirdPlaceMatchID.Int64).Scan(&p1, &p2)
-				if err != nil {
-					return nil, fmt.Errorf("failed to query third place match teams: %w", err)
-				}
-
-				var updateQuery string
-				if !p1.Valid {
-					updateQuery = `UPDATE matches SET team1_id = ? WHERE id = ?`
-				} else if !p2.Valid {
-					updateQuery = `UPDATE matches SET team2_id = ? WHERE id = ?`
-				}
-
-				if updateQuery != "" {
-					_, err = tx.Exec(updateQuery, loserTeamID.Int64, thirdPlaceMatchID.Int64)
-					if err != nil {
-						return nil, fmt.Errorf("failed to update third place match for loser: %w", err)
-					}
-				}
-			} else if err != nil && err != sql.ErrNoRows {
-				return nil, fmt.Errorf("failed to find third place match: %w", err)
-			}
-		}
-	}
-
-	// トランザクションをコミット
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// 更新後の試合情報を取得して返す（トランザクションの外で実行）
 	return r.getMatchByID(matchID)
+}
+
+func (r *MatchRepository) updateMatchAndProgress(tx *sql.Tx, matchID int, team1Score int, team2Score int, winnerTeamID, loserTeamID, nextMatchID, loserNextMatchID sql.NullInt64) error {
+	_, err := tx.Exec(`UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?`,
+		team1Score, team2Score, winnerTeamID, matchID)
+	if err != nil {
+		return fmt.Errorf("failed to update match id %d: %w", matchID, err)
+	}
+	if winnerTeamID.Valid && nextMatchID.Valid {
+		err := r.progressTeamToNextMatch(tx, winnerTeamID, nextMatchID)
+		if err != nil {
+			return fmt.Errorf("failed to progress winner from match id %d: %w", matchID, err)
+		}
+	}
+	if loserTeamID.Valid && loserNextMatchID.Valid {
+		err := r.progressTeamToNextMatch(tx, loserTeamID, loserNextMatchID)
+		if err != nil {
+			return fmt.Errorf("failed to progress loser from match id %d: %w", matchID, err)
+		}
+	}
+	return nil
+}
+
+func (r *MatchRepository) progressTeamToNextMatch(tx *sql.Tx, teamToProgress, nextMatchID sql.NullInt64) error {
+	var team1, team2 sql.NullInt64
+	err := tx.QueryRow(`SELECT team1_id, team2_id FROM matches WHERE id = ?`, nextMatchID.Int64).Scan(&team1, &team2)
+	if err != nil {
+		return err
+	}
+
+	var updateQuery string
+	if !team1.Valid {
+		updateQuery = `UPDATE matches SET team1_id = ? WHERE id = ?`
+	} else if !team2.Valid {
+		updateQuery = `UPDATE matches SET team2_id = ? WHERE id = ?`
+	}
+
+	if updateQuery != "" {
+		_, err = tx.Exec(updateQuery, teamToProgress.Int64, nextMatchID.Int64)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // getMatchByID は指定されたIDの試合情報を取得するヘルパー関数です。
