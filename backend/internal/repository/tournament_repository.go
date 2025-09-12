@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/saku0512/GYOUJI_HP/backend/internal/model"
 )
@@ -104,9 +105,48 @@ func (r *TournamentRepository) transformToBracketryData(tournamentName string, t
 		bracketryRounds = append(bracketryRounds, model.BracketryRound{Name: roundName})
 	}
 
+	// Contestants を試合に参加するチームIDからも構築する（敗者戦など他トーナメント所属のチームIDにも対応）
 	bracketryContestants := make(map[string]model.BracketryContestant)
+
+	// まずはトーナメント所属チームを登録
 	if len(teams) > 0 {
 		for _, team := range teams {
+			teamIDStr := strconv.FormatInt(team.ID, 10)
+			bracketryContestants[teamIDStr] = model.BracketryContestant{
+				EntryStatus: team.EntryStatus,
+				Players:     []model.Player{{Title: team.Name}},
+			}
+		}
+	}
+
+	// 次に、試合に現れる全チームIDを収集
+	teamIDSet := make(map[int64]struct{})
+	for _, m := range matches {
+		if m.Team1ID != nil {
+			teamIDSet[*m.Team1ID] = struct{}{}
+		}
+		if m.Team2ID != nil {
+			teamIDSet[*m.Team2ID] = struct{}{}
+		}
+		if m.WinnerTeamID != nil {
+			teamIDSet[*m.WinnerTeamID] = struct{}{}
+		}
+	}
+	// 既に登録済みのIDを除外
+	var missingIDs []int64
+	for id := range teamIDSet {
+		idStr := strconv.FormatInt(id, 10)
+		if _, exists := bracketryContestants[idStr]; !exists {
+			missingIDs = append(missingIDs, id)
+		}
+	}
+	// 未登録IDのチーム情報をID指定で取得し、Contestantsに追加
+	if len(missingIDs) > 0 {
+		fetched, err := r.getTeamsByIDs(missingIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, team := range fetched {
 			teamIDStr := strconv.FormatInt(team.ID, 10)
 			bracketryContestants[teamIDStr] = model.BracketryContestant{
 				EntryStatus: team.EntryStatus,
@@ -261,4 +301,34 @@ func (r *TournamentRepository) getMatchesForTournament(tournamentID int64) ([]mo
 		matches = append(matches, match)
 	}
 	return matches, nil
+}
+
+// getTeamsByIDs fetches team rows for the provided team IDs.
+func (r *TournamentRepository) getTeamsByIDs(teamIDs []int64) ([]model.Team, error) {
+	if len(teamIDs) == 0 {
+		return []model.Team{}, nil
+	}
+	// 動的 IN 句を作成
+	placeholders := make([]string, 0, len(teamIDs))
+	args := make([]interface{}, 0, len(teamIDs))
+	for _, id := range teamIDs {
+		placeholders = append(placeholders, "?")
+		args = append(args, id)
+	}
+	query := fmt.Sprintf("SELECT id, name, tournament_id, entry_status FROM teams WHERE id IN (%s)", strings.Join(placeholders, ","))
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []model.Team
+	for rows.Next() {
+		var t model.Team
+		if err := rows.Scan(&t.ID, &t.Name, &t.TournamentID, &t.EntryStatus); err != nil {
+			return nil, err
+		}
+		teams = append(teams, t)
+	}
+	return teams, nil
 }

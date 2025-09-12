@@ -80,9 +80,10 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	if matchSport == "table_tennis" && tournamentName == "卓球（晴天時）" {
 		var rainyMatchID int
 		var rainyNextMatchID, rainyLoserNextMatchID sql.NullInt64
+		var rainyTeam1ID, rainyTeam2ID sql.NullInt64
 
 		rainyQuery := `
-			SELECT m_rainy.id, m_rainy.next_match_id, m_rainy.loser_next_match_id
+			SELECT m_rainy.id, m_rainy.next_match_id, m_rainy.loser_next_match_id, m_rainy.team1_id, m_rainy.team2_id, m_rainy.match_number_in_round
 			FROM matches m_sunny
 			JOIN tournaments t_rainy ON t_rainy.name = '卓球（雨天時）'
 			JOIN matches m_rainy ON m_rainy.tournament_id = t_rainy.id 
@@ -90,15 +91,68 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 				AND m_rainy.match_number_in_round = m_sunny.match_number_in_round
 			WHERE m_sunny.id = ?`
 
-		err = tx.QueryRow(rainyQuery, matchID).Scan(&rainyMatchID, &rainyNextMatchID, &rainyLoserNextMatchID)
+		var rainyMatchNumberInRound sql.NullInt64
+		err = tx.QueryRow(rainyQuery, matchID).Scan(&rainyMatchID, &rainyNextMatchID, &rainyLoserNextMatchID, &rainyTeam1ID, &rainyTeam2ID, &rainyMatchNumberInRound)
 		if err != nil && err != sql.ErrNoRows {
 			return nil, fmt.Errorf("failed to find corresponding rainy match: %w", err)
 		}
 
 		if rainyMatchID != 0 {
-			err = r.updateMatchAndProgress(tx, rainyMatchID, team1Score, team2Score, winnerTeamID, loserTeamID, rainyNextMatchID, rainyLoserNextMatchID)
+			// 雨天側の勝者/敗者は雨天トーナメントのチームIDで決定する
+			var rainyWinnerTeamID, rainyLoserTeamID sql.NullInt64
+			if team1Score > team2Score {
+				rainyWinnerTeamID = rainyTeam1ID
+				rainyLoserTeamID = rainyTeam2ID
+			} else if team2Score > team1Score {
+				rainyWinnerTeamID = rainyTeam2ID
+				rainyLoserTeamID = rainyTeam1ID
+			}
+
+			err = r.updateMatchAndProgress(tx, rainyMatchID, team1Score, team2Score, rainyWinnerTeamID, rainyLoserTeamID, rainyNextMatchID, rainyLoserNextMatchID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to sync rainy match: %w", err)
+			}
+
+			// 1回戦の敗者を雨天の敗者復活戦トーナメントへ登録（重複防止チェックつき）
+			if currentRound == 1 && rainyLoserTeamID.Valid && rainyMatchNumberInRound.Valid {
+				var loserTournamentName string
+				var loserEntryMatchNumber int
+				switch rainyMatchNumberInRound.Int64 {
+				case 1, 2:
+					loserTournamentName = "卓球（雨天時・敗者戦左側）"
+					loserEntryMatchNumber = 13
+				case 3, 4:
+					loserTournamentName = "卓球（雨天時・敗者戦左側）"
+					loserEntryMatchNumber = 14
+				case 5, 6:
+					loserTournamentName = "卓球（雨天時・敗者戦右側）"
+					loserEntryMatchNumber = 13
+				case 7, 8:
+					loserTournamentName = "卓球（雨天時・敗者戦右側）"
+					loserEntryMatchNumber = 14
+				}
+				if loserTournamentName != "" {
+					var loserEntryMatchID sql.NullInt64
+					q := `
+						SELECT m.id
+						FROM tournaments tr
+						JOIN matches m ON m.tournament_id = tr.id
+						WHERE tr.name = ? AND m.round = 1 AND m.match_number_in_round = ?`
+					err = tx.QueryRow(q, loserTournamentName, loserEntryMatchNumber).Scan(&loserEntryMatchID)
+					if err == nil && loserEntryMatchID.Valid {
+						// 既に同じチームが登録済みか確認し、未登録なら割り当て
+						var existingTeam1, existingTeam2 sql.NullInt64
+						if err := tx.QueryRow(`SELECT team1_id, team2_id FROM matches WHERE id = ?`, loserEntryMatchID.Int64).Scan(&existingTeam1, &existingTeam2); err == nil {
+							if (existingTeam1.Valid && existingTeam1.Int64 == rainyLoserTeamID.Int64) || (existingTeam2.Valid && existingTeam2.Int64 == rainyLoserTeamID.Int64) {
+								// すでに登録済み
+							} else {
+								if err := r.progressTeamToNextMatch(tx, rainyLoserTeamID, loserEntryMatchID); err != nil {
+									return nil, fmt.Errorf("failed to progress loser to rainy consolation: %w", err)
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}

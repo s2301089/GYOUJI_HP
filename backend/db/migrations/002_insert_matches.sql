@@ -166,21 +166,25 @@ INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team
 SET @tt_rainy_loser1_tour_id = (SELECT id FROM tournaments WHERE name = '卓球（雨天時・敗者戦左側）');
 INSERT INTO matches (tournament_id, round, match_number_in_round) VALUES
 (@tt_rainy_loser1_tour_id, 2, 15), -- 敗者戦1 決勝
-(@tt_rainy_loser1_tour_id, 1, 13); -- 敗者戦1 1回戦
+(@tt_rainy_loser1_tour_id, 1, 13), -- 敗者戦1 1回戦(第1試合)
+(@tt_rainy_loser1_tour_id, 1, 14); -- 敗者戦1 1回戦(第2試合)
 
 SET @ttrl1_match_15_id = (SELECT id FROM matches WHERE tournament_id = @tt_rainy_loser1_tour_id AND match_number_in_round = 15);
 SET @ttrl1_match_13_id = (SELECT id FROM matches WHERE tournament_id = @tt_rainy_loser1_tour_id AND match_number_in_round = 13);
-UPDATE matches SET next_match_id = @ttrl1_match_15_id WHERE id = @ttrl1_match_13_id;
+SET @ttrl1_match_14_id = (SELECT id FROM matches WHERE tournament_id = @tt_rainy_loser1_tour_id AND match_number_in_round = 14);
+UPDATE matches SET next_match_id = @ttrl1_match_15_id WHERE id IN (@ttrl1_match_13_id, @ttrl1_match_14_id);
 
 -- 敗者戦2 (右側ブロック)
 SET @tt_rainy_loser2_tour_id = (SELECT id FROM tournaments WHERE name = '卓球（雨天時・敗者戦右側）');
 INSERT INTO matches (tournament_id, round, match_number_in_round) VALUES
 (@tt_rainy_loser2_tour_id, 2, 16), -- 敗者戦2 決勝
-(@tt_rainy_loser2_tour_id, 1, 14); -- 敗者戦2 1回戦
+(@tt_rainy_loser2_tour_id, 1, 13), -- 敗者戦2 1回戦(第1試合)
+(@tt_rainy_loser2_tour_id, 1, 14); -- 敗者戦2 1回戦(第2試合)
 
 SET @ttrl2_match_16_id = (SELECT id FROM matches WHERE tournament_id = @tt_rainy_loser2_tour_id AND match_number_in_round = 16);
+SET @ttrl2_match_13_id = (SELECT id FROM matches WHERE tournament_id = @tt_rainy_loser2_tour_id AND match_number_in_round = 13);
 SET @ttrl2_match_14_id = (SELECT id FROM matches WHERE tournament_id = @tt_rainy_loser2_tour_id AND match_number_in_round = 14);
-UPDATE matches SET next_match_id = @ttrl2_match_16_id WHERE id = @ttrl2_match_14_id;
+UPDATE matches SET next_match_id = @ttrl2_match_16_id WHERE id IN (@ttrl2_match_13_id, @ttrl2_match_14_id);
 
 -- ----------------------------------------------------------------
 -- 5. 8人制サッカー: チームと試合の登録 (P.21参照)
