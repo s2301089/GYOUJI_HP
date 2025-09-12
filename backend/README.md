@@ -123,6 +123,32 @@ backend/
   - `403 Forbidden`: この試合を更新する権限がありません。
   - `404 Not Found`: 指定されたIDの試合は存在しません。
 
+#### `GET /api/matches/:sport`
+- **説明:** 指定された競技の試合情報を取得します。
+- **認証:** admin, superroot
+- **URLパラメータ:**
+  - `sport`: 競技名 (例: `volleyball`, `soccer`)
+- **レスポンス:**
+  - `200 OK`: 指定された競技の試合情報の配列
+    ```json
+    [
+      {
+        "id": 1,
+        "match_number_in_round": 1,
+        "round": 1,
+        "team1_id": 10,
+        "team1_name": "A組",
+        "team2_id": 11,
+        "team2_name": "B組",
+        "team1_score": 2,
+        "team2_score": 1,
+        "winner_team_id": 10,
+        "status": "finished",
+        "next_match_id": 5
+      },
+  ]
+     - `404 Not Found`: 指定された競技の試合が見つかりません。
+
 ### 4. 管理者機能 (Superrootのみ)
 
 #### `GET /api/admin/users`

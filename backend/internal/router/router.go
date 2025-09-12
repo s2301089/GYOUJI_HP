@@ -54,6 +54,8 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 
 		// 試合スコア更新API（認証必須）
 		api.PUT("/matches/:id", middleware.AuthMiddleware(jwtSecret), matchHandler.UpdateMatchScore)
+		// 試合一覧取得API（認証必須）
+		api.GET("/matches/:sport", middleware.AuthMiddleware(jwtSecret), matchHandler.GetMatchesBySport)
 	}
 
 	return r

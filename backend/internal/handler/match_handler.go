@@ -13,6 +13,52 @@ type MatchHandler struct {
 	Service service.MatchServiceInterface
 }
 
+// GET /api/matches/:sport
+// GetMatchesBySport godoc
+// @Summary      指定競技の試合一覧取得
+// @Description  指定された競技の試合情報を取得します。admin/superrootのみアクセス可能。
+// @Tags         matches
+// @Produce      json
+// @Param        sport path string true "競技名"
+// @Param        Authorization header string true "Bearerトークン"
+// @Success      200 {array} model.MatchResponse "試合情報一覧"
+// @Failure      401 {object} model.ErrorResponse "認証が必要です (Unauthorized)"
+// @Failure      403 {object} model.ErrorResponse "権限がありません (Forbidden)"
+// @Failure      404 {object} model.ErrorResponse "試合が見つかりません (Not found)"
+// @Router       /api/matches/{sport} [get]
+// @Security     ApiKeyAuth
+func (h *MatchHandler) GetMatchesBySport(c *gin.Context) {
+	sport := c.Param("sport")
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userMap, ok := user.(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	role, _ := userMap["role"].(string)
+	assignedSport, _ := userMap["assigned_sport"].(string)
+	// 権限判定
+	if !(role == "superroot" || (role == "admin" && assignedSport == sport)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You do not have permission to view matches for this sport."})
+		return
+	}
+	// サービス層から試合一覧取得
+	matches, err := h.Service.GetMatchesBySport(sport)
+	if err != nil {
+		if err.Error() == "not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No matches found for this sport."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, matches)
+}
+
 func NewMatchHandler(s service.MatchServiceInterface) *MatchHandler {
 	return &MatchHandler{Service: s}
 }

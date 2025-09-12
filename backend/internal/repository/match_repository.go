@@ -134,3 +134,69 @@ func (r *MatchRepository) getMatchByID(matchID int) (interface{}, error) {
 	}
 	return match, nil
 }
+
+// GetMatchesBySport は指定された競技の試合一覧を取得します。
+func (r *MatchRepository) GetMatchesBySport(sport string) ([]model.MatchResponse, error) {
+	query := `
+		SELECT m.id, m.match_number_in_round, m.round,
+			   m.team1_id, t1.name, m.team2_id, t2.name,
+			   m.team1_score, m.team2_score, m.winner_team_id, m.status, m.next_match_id
+		FROM matches m
+		JOIN tournaments tr ON m.tournament_id = tr.id
+		LEFT JOIN teams t1 ON m.team1_id = t1.id
+		LEFT JOIN teams t2 ON m.team2_id = t2.id
+		WHERE tr.sport = ?
+		ORDER BY m.round, m.match_number_in_round`
+	rows, err := r.DB.Query(query, sport)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []model.MatchResponse
+	for rows.Next() {
+		var res model.MatchResponse
+		var team1Name, team2Name, status sql.NullString
+		var team1Score, team2Score sql.NullInt64
+
+		err := rows.Scan(
+			&res.ID, &res.MatchNumberInRound, &res.Round,
+			&res.Team1ID, &team1Name, &res.Team2ID, &team2Name,
+			&team1Score, &team2Score, &res.WinnerTeamID, &status, &res.NextMatchID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// sql.Null* 型からポインタ型へ変換
+		if team1Name.Valid {
+			res.Team1Name = &team1Name.String
+		}
+		if team2Name.Valid {
+			res.Team2Name = &team2Name.String
+		}
+		if status.Valid {
+			res.Status = &status.String
+		}
+		if team1Score.Valid {
+			score := int(team1Score.Int64)
+			res.Team1Score = &score
+		}
+		if team2Score.Valid {
+			score := int(team2Score.Int64)
+			res.Team2Score = &score
+		}
+
+		results = append(results, res)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(results) == 0 {
+		return nil, fmt.Errorf("not found")
+	}
+
+	return results, nil
+}
