@@ -34,7 +34,7 @@ type LoginRequest struct {
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
-// @Router /auth/login [post]
+// @Router /api/auth/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -58,7 +58,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]string
-// @Router /auth/logout [post]
+// @Router /api/auth/logout [post]
 func (h *UserHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
@@ -71,7 +71,7 @@ func (h *UserHandler) Logout(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /auth/me [get]
+// @Router /api/auth/me [get]
 func (h *UserHandler) GetMe(c *gin.Context) {
 	user, exists := c.Get("user") // AuthMiddlewareでセットされている前提
 	if !exists {
