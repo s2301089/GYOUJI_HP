@@ -127,6 +127,68 @@ func TestUserHandler_Login(t *testing.T) {
 	}
 }
 
+func TestUserHandler_GetMe(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// --- テストケースの定義 ---
+	testCases := []struct {
+		name                 string      // テストケース名
+		userContext          interface{} // Ginコンテキストにセットするユーザー情報
+		expectedStatusCode   int         // 期待されるHTTPステータスコード
+		expectedResponseBody string      // 期待されるレスポンスボディ(JSON文字列)
+	}{
+		{
+			name: "正常系: ユーザー情報がコンテキストに存在する",
+			userContext: map[string]interface{}{
+				"user_id":        1,
+				"username":       "admin",
+				"role":           "admin",
+				"assigned_sport": "soccer",
+			},
+			expectedStatusCode:   http.StatusOK,
+			expectedResponseBody: `{"user_id":1, "username":"admin", "role":"admin", "assigned_sport":"soccer"}`,
+		},
+		{
+			name:                 "異常系: ユーザー情報がコンテキストに存在しない",
+			userContext:          nil, // ユーザー情報がないケース
+			expectedStatusCode:   http.StatusUnauthorized,
+			expectedResponseBody: `{"error":"Unauthorized"}`,
+		},
+	}
+
+	// --- テストの実行 ---
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// モックサービスとハンドラの準備
+			mockService := new(MockUserService) // GetMeでは使われないが初期化に必要
+			userHandler := handler.NewUserHandler(mockService)
+
+			// レスポンスレコーダーとルーターの準備
+			w := httptest.NewRecorder()
+			router := gin.Default()
+
+			// テスト対象のエンドポイントを定義
+			router.GET("/api/auth/me", func(c *gin.Context) {
+				// ミドルウェアの動作をシミュレート
+				if tc.userContext != nil {
+					c.Set("user", tc.userContext)
+				}
+				userHandler.GetMe(c)
+			})
+
+			// HTTPリクエストの作成と実行
+			req, _ := http.NewRequest(http.MethodGet, "/api/auth/me", nil)
+			router.ServeHTTP(w, req)
+
+			// 結果の検証
+			assert.Equal(t, tc.expectedStatusCode, w.Code, "ステータスコードが期待値と一致しません")
+
+			// assert.JSONEq を使うことで、キーの順序が違っても内容が同じであればパスします。
+			assert.JSONEq(t, tc.expectedResponseBody, w.Body.String(), "レスポンスボディが期待値と一致しません")
+		})
+	}
+}
+
 func TestUserHandler_Logout(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const jwtSecret = "test_secret_key"

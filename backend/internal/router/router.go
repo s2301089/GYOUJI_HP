@@ -44,10 +44,11 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 			// ログインは認証不要
 			auth.POST("/login", userHandler.Login)
 
-			// ログアウトは認証必須
+			// ログアウト・ユーザー情報取得は認証必須
 			auth.Use(middleware.AuthMiddleware(jwtSecret))
 			{
 				auth.POST("/logout", userHandler.Logout)
+				auth.GET("/me", userHandler.GetMe)
 			}
 		}
 

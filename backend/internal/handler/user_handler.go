@@ -62,3 +62,21 @@ func (h *UserHandler) Login(c *gin.Context) {
 func (h *UserHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
+
+// GET /api/auth/me
+// GetMe godoc
+// @Summary Get UserData
+// @Description Get UserData by AuthMiddleware
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /auth/me [get]
+func (h *UserHandler) GetMe(c *gin.Context) {
+	user, exists := c.Get("user") // AuthMiddlewareでセットされている前提
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}

@@ -14,9 +14,10 @@ import (
 
 // JWTのClaims（ペイロード）の定義
 type Claims struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID        int64  `json:"user_id"`
+	Username      string `json:"username"`
+	Role          string `json:"role"`
+	AssignedSport string `json:"assigned_sport"`
 	jwt.RegisteredClaims
 }
 
@@ -61,9 +62,10 @@ func (s *userService) Login(username, password string) (string, error) {
 	// 3. JWTを生成
 	expirationTime := time.Now().Add(24 * time.Hour) // トークンの有効期限を24時間に設定
 	claims := &Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
+		UserID:        user.ID,
+		Username:      user.Username,
+		Role:          user.Role,
+		AssignedSport: user.AssignedSport,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},

@@ -43,6 +43,16 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 
+		// userが未セットならまとめてセット
+		if _, exists := c.Get("user"); !exists {
+			c.Set("user", map[string]interface{}{
+				"user_id":        claims.UserID,
+				"username":       claims.Username,
+				"role":           claims.Role,
+				"assigned_sport": claims.AssignedSport,
+			})
+		}
+
 		// 次の処理へ進む
 		c.Next()
 	}
