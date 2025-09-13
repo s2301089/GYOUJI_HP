@@ -1,0 +1,1 @@
+INSERT INTO team_points (class_id) SELECT class_id FROM teams WHERE tournament_id = 1;

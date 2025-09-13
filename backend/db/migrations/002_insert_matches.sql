@@ -17,11 +17,11 @@ INSERT INTO tournaments (name, sport, weather_condition) VALUES
 SET @volleyball_tour_id = (SELECT id FROM tournaments WHERE name = 'バレーボール');
 
 -- チーム登録
-INSERT INTO teams (name, tournament_id) VALUES
-('専・教', @volleyball_tour_id), ('IE4', @volleyball_tour_id), ('IS5', @volleyball_tour_id), ('IT4', @volleyball_tour_id),
-('IT3', @volleyball_tour_id), ('IT2', @volleyball_tour_id), ('1-1', @volleyball_tour_id), ('IE2', @volleyball_tour_id),
-('IS3', @volleyball_tour_id), ('IS2', @volleyball_tour_id), ('IS4', @volleyball_tour_id), ('IE5', @volleyball_tour_id),
-('1-2', @volleyball_tour_id), ('1-3', @volleyball_tour_id), ('IE3', @volleyball_tour_id), ('IT5', @volleyball_tour_id);
+INSERT INTO teams (class_id, name, tournament_id) VALUES
+(6, '専・教', @volleyball_tour_id), (43, 'IE4', @volleyball_tour_id), (51, 'IS5', @volleyball_tour_id), (42, 'IT4', @volleyball_tour_id),
+(32, 'IT3', @volleyball_tour_id), (22, 'IT2', @volleyball_tour_id), (11, '1-1', @volleyball_tour_id), (23, 'IE2', @volleyball_tour_id),
+(31, 'IS3', @volleyball_tour_id), (21, 'IS2', @volleyball_tour_id), (41, 'IS4', @volleyball_tour_id), (53, 'IE5', @volleyball_tour_id),
+(12, '1-2', @volleyball_tour_id), (13, '1-3', @volleyball_tour_id), (33, 'IE3', @volleyball_tour_id), (52, 'IT5', @volleyball_tour_id);
 
 -- 試合枠の作成（決勝から順に作成）
 INSERT INTO matches (tournament_id, round, match_number_in_round) VALUES
@@ -68,11 +68,11 @@ INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team
 -- ----------------------------------------------------------------
 SET @tt_sunny_tour_id = (SELECT id FROM tournaments WHERE name = '卓球（晴天時）');
 
-INSERT INTO teams (name, tournament_id) VALUES
-('1-2', @tt_sunny_tour_id), ('IE5', @tt_sunny_tour_id), ('1-3', @tt_sunny_tour_id), ('IE4', @tt_sunny_tour_id),
-('IS5', @tt_sunny_tour_id), ('IE2', @tt_sunny_tour_id), ('IS2', @tt_sunny_tour_id), ('IS4', @tt_sunny_tour_id),
-('IE3', @tt_sunny_tour_id), ('IT2', @tt_sunny_tour_id), ('IT3', @tt_sunny_tour_id), ('IT4', @tt_sunny_tour_id),
-('1-1', @tt_sunny_tour_id), ('IS3', @tt_sunny_tour_id), ('IT5', @tt_sunny_tour_id), ('専・教', @tt_sunny_tour_id);
+INSERT INTO teams (class_id, name, tournament_id) VALUES
+(12, '1-2', @tt_sunny_tour_id), (53, 'IE5', @tt_sunny_tour_id), (13, '1-3', @tt_sunny_tour_id), (43, 'IE4', @tt_sunny_tour_id),
+(51, 'IS5', @tt_sunny_tour_id), (23, 'IE2', @tt_sunny_tour_id), (21, 'IS2', @tt_sunny_tour_id), (41, 'IS4', @tt_sunny_tour_id),
+(33, 'IE3', @tt_sunny_tour_id), (22, 'IT2', @tt_sunny_tour_id), (32, 'IT3', @tt_sunny_tour_id), (42, 'IT4', @tt_sunny_tour_id),
+(11, '1-1', @tt_sunny_tour_id), (31, 'IS3', @tt_sunny_tour_id), (52, 'IT5', @tt_sunny_tour_id), (6, '専・教', @tt_sunny_tour_id);
 
 -- 試合枠の作成（決勝から順に作成）
 INSERT INTO matches (tournament_id, round, match_number_in_round) VALUES
@@ -118,11 +118,11 @@ INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team
 -- ----------------------------------------------------------------
 SET @tt_rainy_tour_id = (SELECT id FROM tournaments WHERE name = '卓球（雨天時）');
 
-INSERT INTO teams (name, tournament_id) VALUES
-('1-2', @tt_rainy_tour_id), ('IE5', @tt_rainy_tour_id), ('1-3', @tt_rainy_tour_id), ('IE4', @tt_rainy_tour_id),
-('IS5', @tt_rainy_tour_id), ('IE2', @tt_rainy_tour_id), ('IS2', @tt_rainy_tour_id), ('IS4', @tt_rainy_tour_id),
-('IE3', @tt_rainy_tour_id), ('IT2', @tt_rainy_tour_id), ('IT3', @tt_rainy_tour_id), ('IT4', @tt_rainy_tour_id),
-('1-1', @tt_rainy_tour_id), ('IS3', @tt_rainy_tour_id), ('IT5', @tt_rainy_tour_id), ('専・教', @tt_rainy_tour_id);
+INSERT INTO teams (class_id, name, tournament_id) VALUES
+(12, '1-2', @tt_rainy_tour_id), (53, 'IE5', @tt_rainy_tour_id), (13, '1-3', @tt_rainy_tour_id), (43, 'IE4', @tt_rainy_tour_id),
+(51, 'IS5', @tt_rainy_tour_id), (23, 'IE2', @tt_rainy_tour_id), (21, 'IS2', @tt_rainy_tour_id), (41, 'IS4', @tt_rainy_tour_id),
+(33, 'IE3', @tt_rainy_tour_id), (22, 'IT2', @tt_rainy_tour_id), (32, 'IT3', @tt_rainy_tour_id), (42, 'IT4', @tt_rainy_tour_id),
+(11, '1-1', @tt_rainy_tour_id), (31, 'IS3', @tt_rainy_tour_id), (52, 'IT5', @tt_rainy_tour_id), (6, '専・教', @tt_rainy_tour_id);
 
 -- 試合枠の作成（決勝から順に作成）
 INSERT INTO matches (tournament_id, round, match_number_in_round) VALUES
@@ -191,11 +191,11 @@ UPDATE matches SET next_match_id = @ttrl2_match_16_id WHERE id IN (@ttrl2_match_
 -- ----------------------------------------------------------------
 SET @soccer_tour_id = (SELECT id FROM tournaments WHERE name = '8人制サッカー');
 
-INSERT INTO teams (name, tournament_id) VALUES
-('IS3', @soccer_tour_id), ('IE2', @soccer_tour_id), ('1-1', @soccer_tour_id), ('IS2', @soccer_tour_id),
-('IS4', @soccer_tour_id), ('IT5', @soccer_tour_id), ('IS5', @soccer_tour_id), ('専・教', @soccer_tour_id),
-('1-2', @soccer_tour_id), ('1-3', @soccer_tour_id), ('IE3', @soccer_tour_id), ('IT4', @soccer_tour_id),
-('IT3', @soccer_tour_id), ('IE4', @soccer_tour_id), ('IT2', @soccer_tour_id), ('IE5', @soccer_tour_id);
+INSERT INTO teams (class_id, name, tournament_id) VALUES
+(31, 'IS3', @soccer_tour_id), (23, 'IE2', @soccer_tour_id), (11, '1-1', @soccer_tour_id), (21, 'IS2', @soccer_tour_id),
+(41, 'IS4', @soccer_tour_id), (52, 'IT5', @soccer_tour_id), (51, 'IS5', @soccer_tour_id), (6, '専・教', @soccer_tour_id),
+(12, '1-2', @soccer_tour_id), (13, '1-3', @soccer_tour_id), (33, 'IE3', @soccer_tour_id), (42, 'IT4', @soccer_tour_id),
+(32, 'IT3', @soccer_tour_id), (43, 'IE4', @soccer_tour_id), (22, 'IT2', @soccer_tour_id), (53, 'IE5', @soccer_tour_id);
 
 INSERT INTO matches (tournament_id, round, match_number_in_round) VALUES
 (@soccer_tour_id, 4, 16), -- 決勝

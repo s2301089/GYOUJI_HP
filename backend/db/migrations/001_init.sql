@@ -15,6 +15,7 @@ CREATE TABLE tournaments (
 
 CREATE TABLE teams (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    class_id INT,
     name VARCHAR(255) NOT NULL,
     tournament_id INT,
     entry_status VARCHAR(255),
@@ -38,4 +39,26 @@ CREATE TABLE matches (
     FOREIGN KEY (team2_id) REFERENCES teams(id),
     FOREIGN KEY (winner_team_id) REFERENCES teams(id),
     FOREIGN KEY (next_match_id) REFERENCES matches(id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- チームごとのポイント内訳を記録するテーブル
+CREATE TABLE team_points (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  class_id INT NOT NULL UNIQUE,
+  init_score INT DEFAULT 0,
+  attendance_score INT DEFAULT 0,
+  volleyball1_score INT DEFAULT 0,
+  volleyball2_score INT DEFAULT 0,
+  volleyball3_score INT DEFAULT 0,
+  volleyball_championship_score INT DEFAULT 0,
+  table_tennis1_score INT DEFAULT 0,
+  table_tennis2_score INT DEFAULT 0,
+  table_tennis3_score INT DEFAULT 0,
+  table_tennis_championship_score INT DEFAULT 0,
+  table_tennis_rainy_bonus_score INT DEFAULT 0,
+  soccer1_score INT DEFAULT 0,
+  soccer2_score INT DEFAULT 0,
+  soccer3_score INT DEFAULT 0,
+  soccer_championship_score INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

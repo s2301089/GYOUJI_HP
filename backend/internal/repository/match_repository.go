@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/saku0512/GYOUJI_HP/backend/internal/model"
 )
@@ -63,12 +62,28 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	}
 
 	var winnerTeamID, loserTeamID sql.NullInt64
+	var winnerClassID, loserClassID sql.NullInt64
 	if team1Score > team2Score {
 		winnerTeamID = team1ID
 		loserTeamID = team2ID
 	} else if team2Score > team1Score {
 		winnerTeamID = team2ID
 		loserTeamID = team1ID
+	}
+	// チームIDからclass_idを取得
+	if winnerTeamID.Valid {
+		err = tx.QueryRow("SELECT class_id FROM teams WHERE id = ?", winnerTeamID.Int64).Scan(&winnerClassID)
+		if err != nil {
+			// エラー処理: クエリが失敗したか、結果がなかった場合
+			log.Printf("Could not find class_id for winner team %d: %v", winnerTeamID.Int64, err)
+			// 必要に応じてロールバックやエラー返却
+		}
+	}
+	if loserTeamID.Valid {
+		err = tx.QueryRow("SELECT class_id FROM teams WHERE id = ?", loserTeamID.Int64).Scan(&loserClassID)
+		if err != nil {
+			log.Printf("Could not find class_id for loser team %d: %v", loserTeamID.Int64, err)
+		}
 	}
 
 	// DRY原則に基づき、更新ロジックを関数化
@@ -78,58 +93,64 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	}
 
 	// --- ポイント付与ロジック ---
-	if winnerTeamID.Valid {
-		// 1) 勝利ポイント +10（決勝は除く）
-		isFinalRound := false
-		isBronzeMatch := false
-		{
-			var cnt int
-			_ = tx.QueryRow(`SELECT COUNT(*) FROM matches WHERE tournament_id = ? AND round = ?`, tournamentID, currentRound).Scan(&cnt)
-			if cnt == 1 {
-				isFinalRound = true
-			} else if cnt >= 2 {
-				var maxNum, thisNum int
-				_ = tx.QueryRow(`SELECT MAX(match_number_in_round) FROM matches WHERE tournament_id = ? AND round = ?`, tournamentID, currentRound).Scan(&maxNum)
-				_ = tx.QueryRow(`SELECT match_number_in_round FROM matches WHERE id = ?`, matchID).Scan(&thisNum)
-				if thisNum != maxNum {
-					isBronzeMatch = true
-				} else {
-					isFinalRound = true
-				}
-			}
+	if winnerTeamID.Valid && winnerClassID.Valid {
+		// ラウンドごとに該当カラムに10点を登録
+		var scoreColumn string
+		switch currentRound {
+		case 1:
+			scoreColumn = matchSport + "1_score"
+		case 2:
+			scoreColumn = matchSport + "2_score"
+		case 3:
+			scoreColumn = matchSport + "3_score"
 		}
-		if !isFinalRound {
-			if err := r.awardPoints(tx, int(winnerTeamID.Int64), matchSport, tournamentName, "win", 10, matchID); err != nil {
+		if scoreColumn != "" {
+			query := fmt.Sprintf("UPDATE team_points SET %s = 10 WHERE class_id = ?", scoreColumn)
+			_, err := tx.Exec(query, winnerClassID.Int64)
+			if err != nil {
 				return nil, err
 			}
 		}
 
-		// 2) ベスト4ボーナス
-		if isFinalRound {
-			if err := r.awardPoints(tx, int(winnerTeamID.Int64), matchSport, tournamentName, "final_bonus_winner", 80, matchID); err != nil {
-				return nil, err
-			}
-			if loserTeamID.Valid {
-				if err := r.awardPoints(tx, int(loserTeamID.Int64), matchSport, tournamentName, "final_bonus_runnerup", 60, matchID); err != nil {
-					return nil, err
-				}
-			}
-		} else if isBronzeMatch {
-			if err := r.awardPoints(tx, int(winnerTeamID.Int64), matchSport, tournamentName, "bronze_bonus_winner", 50, matchID); err != nil {
-				return nil, err
-			}
-			if loserTeamID.Valid {
-				if err := r.awardPoints(tx, int(loserTeamID.Int64), matchSport, tournamentName, "bronze_bonus_runnerup", 40, matchID); err != nil {
-					return nil, err
-				}
-			}
-		}
+		// 決勝戦・3位決定戦のみchampionship_score加算
+		var maxRound int
+		_ = tx.QueryRow(`SELECT MAX(round) FROM matches WHERE tournament_id = ?`, tournamentID).Scan(&maxRound)
 
-		// 3) 雨天時 敗者復活戦 優勝ボーナス +10
-		if matchSport == "table_tennis" && (strings.Contains(tournamentName, "敗者戦左側") || strings.Contains(tournamentName, "敗者戦右側")) {
-			if currentRound >= 2 {
-				if err := r.awardPoints(tx, int(winnerTeamID.Int64), matchSport, tournamentName, "rainy_loser_champion", 10, matchID); err != nil {
+		if currentRound == maxRound {
+			var maxNum, thisNum int
+			_ = tx.QueryRow(`SELECT MAX(match_number_in_round) FROM matches WHERE tournament_id = ? AND round = ?`, tournamentID, currentRound).Scan(&maxNum)
+			_ = tx.QueryRow(`SELECT match_number_in_round FROM matches WHERE id = ?`, matchID).Scan(&thisNum)
+			champCol := matchSport + "_championship_score"
+			// 決勝戦（ラウンド最終試合）のみ加算
+			if thisNum == maxNum {
+				// 決勝戦
+				var championshipScore int = 80
+				query := fmt.Sprintf("UPDATE team_points SET %s = ? WHERE class_id = ?", champCol)
+				_, err := tx.Exec(query, championshipScore, winnerClassID.Int64)
+				if err != nil {
 					return nil, err
+				}
+				if loserTeamID.Valid && loserClassID.Valid {
+					championshipScore = 60
+					_, err := tx.Exec(query, championshipScore, loserClassID.Int64)
+					if err != nil {
+						return nil, err
+					}
+				}
+			} else if thisNum == maxNum-1 && maxNum > 1 {
+				// 3位決定戦（max-1番目）
+				var bronzeScore int = 50
+				query := fmt.Sprintf("UPDATE team_points SET %s = ? WHERE class_id = ?", champCol)
+				_, err := tx.Exec(query, bronzeScore, winnerClassID.Int64)
+				if err != nil {
+					return nil, err
+				}
+				if loserTeamID.Valid && loserClassID.Valid {
+					bronzeScore = 40
+					_, err := tx.Exec(query, bronzeScore, loserClassID.Int64)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -216,6 +237,19 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 		}
 	}
 
+	// 雨天時の敗者復活戦ブロックで1位になった場合のボーナス加算
+	if winnerTeamID.Valid && winnerClassID.Valid && matchSport == "table_tennis" && (tournamentName == "卓球（雨天時・敗者戦左側）" || tournamentName == "卓球（雨天時・敗者戦右側）") {
+		// 決勝ラウンド（1位決定戦）のみ加算
+		var cnt int
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM matches WHERE tournament_id = ? AND round = ?`, tournamentID, currentRound).Scan(&cnt)
+		if cnt == 1 {
+			_, err := tx.Exec("UPDATE team_points SET table_tennis_rainy_bonus_score = 10 WHERE class_id = ?", winnerClassID.Int64)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -242,21 +276,6 @@ func (r *MatchRepository) updateMatchAndProgress(tx *sql.Tx, matchID int, team1S
 		}
 	}
 	return nil
-}
-
-// awardPoints は重複を避けつつ team_points にポイント行を追加します
-func (r *MatchRepository) awardPoints(tx *sql.Tx, teamID int, sport, tournamentName, pointType string, points int, sourceMatchID int) error {
-	// 重複チェックはDBのユニークキーでも担保されるが、先に存在確認で冪等に
-	var exists int
-	err := tx.QueryRow(`SELECT COUNT(1) FROM team_points WHERE team_id = ? AND source_match_id = ? AND point_type = ?`, teamID, sourceMatchID, pointType).Scan(&exists)
-	if err != nil {
-		return err
-	}
-	if exists > 0 {
-		return nil
-	}
-	_, err = tx.Exec(`INSERT INTO team_points (team_id, sport, tournament_name, point_type, points, source_match_id) VALUES (?,?,?,?,?,?)`, teamID, sport, tournamentName, pointType, points, sourceMatchID)
-	return err
 }
 
 func (r *MatchRepository) progressTeamToNextMatch(tx *sql.Tx, teamToProgress, nextMatchID sql.NullInt64) error {

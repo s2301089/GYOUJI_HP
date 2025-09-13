@@ -85,6 +85,7 @@
 			const res = await fetch(url, {
 				headers: token ? { Authorization: `Bearer ${token}` } : {}
 			});
+			console.log(res);
 
 			if (res.ok) {
 				const data = await res.json();
@@ -322,40 +323,54 @@
 					<p>読み込み中...</p>
 				{:else}
 					{#if scores.length > 0}
-						<table class="scores-table">
-							<thead>
-								<tr>
-									<th>クラス</th>
-									<th>初期点</th>
-									<th>出席点</th>
-									<th>勝利(+10)</th>
-									<th>決勝 優勝(+80)</th>
-									<th>決勝 準優勝(+60)</th>
-									<th>3位決定 勝者(+50)</th>
-									<th>3位決定 敗者(+40)</th>
-									<th>雨天敗者戦 優勝(+10)</th>
-									<th>合計(初期点除く)</th>
-									<th>合計(初期点含む)</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each scores as s}
-									<tr>
-										<td>{s.class_name}</td>
-										<td>{s.init_score}</td>
-										<td>{s.attendance_score}</td>
-										<td>{s.win_points}</td>
-										<td>{s.final_winner_bonus}</td>
-										<td>{s.final_runnerup_bonus}</td>
-										<td>{s.bronze_winner_bonus}</td>
-										<td>{s.bronze_runnerup_bonus}</td>
-										<td>{s.rainy_loser_champion_bonus}</td>
-										<td><b>{s.total_excluding_init}</b></td>
-										<td><b>{s.total_including_init}</b></td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+						 <table class="scores-table">
+						 <thead>
+						 <tr>
+						 <th>クラス</th>
+						 <th>春スポ体合計点</th>
+						 <th>出席点</th>
+						 <th>バレーボール1勝点</th>
+						 <th>バレーボール2勝点</th>
+						 <th>バレーボール3勝点</th>
+						 <th>バレーボール優勝点</th>
+						 <th>卓球1勝点</th>
+						 <th>卓球2勝点</th>
+						 <th>卓球3勝点</th>
+						 <th>卓球優勝点</th>
+						 <th>卓球雨天ボーナス</th>
+						 <th>サッカー1勝点</th>
+						 <th>サッカー2勝点</th>
+						 <th>サッカー3勝点</th>
+						 <th>サッカー優勝点</th>
+						 <th>合計(春スポ体合計点除く)</th>
+						 <th>合計(春スポ体合計点含む)</th>
+						 </tr>
+						 </thead>
+						 <tbody>
+						 {#each scores as s}
+						 <tr>
+						 <td>{s.class_name}</td>
+						 <td>{s.init_score}</td>
+						 <td>{s.attendance_score}</td>
+						 <td>{s.volleyball1_score}</td>
+						 <td>{s.volleyball2_score}</td>
+						 <td>{s.volleyball3_score}</td>
+						 <td>{s.volleyball_championship_score}</td>
+						 <td>{s.table_tennis1_score}</td>
+						 <td>{s.table_tennis2_score}</td>
+						 <td>{s.table_tennis3_score}</td>
+						 <td>{s.table_tennis_championship_score}</td>
+						 <td>{s.table_tennis_rainy_bonus_score}</td>
+						 <td>{s.soccer1_score}</td>
+						 <td>{s.soccer2_score}</td>
+						 <td>{s.soccer3_score}</td>
+						 <td>{s.soccer_championship_score}</td>
+						 <td><b>{s.total_excluding_init}</b></td>
+						 <td><b>{s.total_including_init}</b></td>
+						 </tr>
+						 {/each}
+						 </tbody>
+						 </table>
 					{:else}
 						<p>スコアデータがありません。</p>
 					{/if}
