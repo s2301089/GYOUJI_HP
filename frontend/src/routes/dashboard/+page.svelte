@@ -154,12 +154,31 @@
 	async function fetchScores() {
 		scoresLoading = true;
 		const token = localStorage.getItem('token');
+		const classOrder = [
+			'1-1', '1-2', '1-3', 
+			'IS2', 'IT2', 'IE2', 
+			'IS3', 'IT3', 'IE3', 
+			'IS4', 'IT4', 'IE4', 
+			'IS5', 'IT5', 'IE5', 
+			'専・教'
+		];
 		try {
 			const res = await fetch('/api/score', {
 				headers: token ? { Authorization: `Bearer ${token}` } : {}
 			});
 			if (res.ok) {
-				scores = await res.json();
+				let fetchedScores = await res.json();
+				fetchedScores.sort((a, b) => {
+                    const indexA = classOrder.indexOf(a.class_name);
+                    const indexB = classOrder.indexOf(b.class_name);
+                    
+                    if (indexA === -1 && indexB === -1) return 0;
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+
+                    return indexA - indexB;
+                });
+				scores = fetchedScores;
 			} else {
 				scores = [];
 			}
