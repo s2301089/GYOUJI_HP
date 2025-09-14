@@ -5,9 +5,15 @@
 	import { onMount } from 'svelte';
 
 	// 卓球天候切替用（スライド式）
-	let tableTennisWeather = 'sunny'; // 'sunny' or 'rainy'
+	let tableTennisWeather = (typeof window !== 'undefined' && localStorage.getItem('tableTennisWeather')) || 'sunny';
 	let isRainyChecked = false;
 	$: isRainyChecked = tableTennisWeather === 'rainy';
+
+	$: {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('tableTennisWeather', tableTennisWeather);
+        }
+    }
 
 	function toggleTableTennisWeather() {
 		tableTennisWeather = tableTennisWeather === 'sunny' ? 'rainy' : 'sunny';
