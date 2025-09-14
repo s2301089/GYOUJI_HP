@@ -274,7 +274,7 @@
 		<h1>ダッシュボード</h1>
 		<button on:click={logout}>ログアウト</button>
 		<nav class="dashboard-tabs">
-			<button class:active={activeTab === 'tournament'} on:click={() => activeTab = 'tournament'}>競技トーナメント</button>
+			<button class:active={activeTab === 'tournament'} on:click={() => { activeTab = 'tournament'; fetchTournament('volleyball'); }}>競技トーナメント</button>
 			<button class:active={activeTab === 'scores'} on:click={async () => { activeTab = 'scores'; await fetchScores(); }}>現在の得点</button>
 			{#if userRole === 'superroot' || userRole === 'admin'}
 				<button class:active={activeTab === 'input'} on:click={async () => {
