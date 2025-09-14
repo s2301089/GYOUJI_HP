@@ -63,6 +63,9 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
+      - "traefik.http.routers.backend-https.entrypoints=websecure"
+      - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
       - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
       - "traefik.http.routers.backend.entrypoints=local3300"
       - "traefik.http.services.backend.loadbalancer.server.port=8080"
