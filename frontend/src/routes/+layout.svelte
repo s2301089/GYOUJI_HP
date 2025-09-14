@@ -33,7 +33,6 @@
       <div class="container header-content">
         <div class="header-title-group">
           <a href="/">
-            <img src="/icon.svg" alt="行事委員会 Icon" class="header-icon" />
             <h1>行事委員会</h1>
           </a>
         </div>
