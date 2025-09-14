@@ -485,7 +485,52 @@
         { name: 'リレーボーナス得点', key: 'relay_bonus_score' },
         { name: '合計(春スポ体合計点除く)', key: 'total_excluding_init' },
         { name: '合計(春スポ体合計点含む)', key: 'total_including_init' },
+        { name: '現在の順位', key: 'current_rank' },
     ];
+
+	// 順位を計算する関数
+	/**
+ 	* スコアの配列を受け取り、順位（current_rank）を追加して返す関数
+ 	* @param {Array} scoresData 各クラスのスコアオブジェクトの配列
+ 	* @returns {Array} `current_rank` プロパティが追加された新しい配列
+ 	*/
+	function calculateRanks(scoresData) {
+    	// データが空なら何もしない
+    	if (!scoresData || scoresData.length === 0) {
+        	return [];
+    	}
+
+    	// --- 手順1: 合計点（total_including_init）で全クラスを並び替える ---
+    	// これが「各クラスで比較して」の部分です。
+    	// 元の配列を壊さないようにコピー(`...scoresData`)してからソートします。
+    	const sorted = [...scoresData].sort((a, b) => b.total_including_init - a.total_including_init);
+    
+    	// --- 手順2: 順位を決定し、Mapオブジェクトに保存する ---
+    	// これが「順位付けすれば」の部分です。
+    	const rankMap = new Map();
+    	let rank = 1;
+
+    	for (let i = 0; i < sorted.length; i++) {
+        	// 前のクラスよりスコアが低い場合、順位をその位置（i + 1）に更新します。
+        	// 同じスコア（同点）の場合は、このif文に入らないため、同じ順位が維持されます。
+        	if (i > 0 && sorted[i].total_including_init < sorted[i - 1].total_including_init) {
+            	rank = i + 1;
+        	}
+        	// 「クラス名」をキーにして、決定した順位を保存します。
+        	// 例: rankMap.set('1-1', 5);
+        	rankMap.set(sorted[i].class_name, rank);
+    	}
+
+    	// --- 手順3: 元の配列の順番を維持したまま、順位を合体させる ---
+    	// 画面の表示順を変えずに、計算した順位だけを追加します。
+    	return scoresData.map(s => ({
+        	...s, // 元のスコアデータはそのまま
+        	current_rank: rankMap.get(s.class_name) // Mapからクラス名に対応する順位を取得して追加
+    	}));
+	}
+
+	// スコアデータに順位を追加
+	$: scoresWithRanks = scores.length > 0 ? calculateRanks(scores) : [];
 </script>
 
 <div class="dashboard-container">
@@ -577,11 +622,17 @@
 							{/each}
 						</div>
 						<div class="scores-data-wrapper">
-							{#each scores as s}
+							{#each scoresWithRanks as s}
 								<div class="score-column">
 									<div class="score-header">{s.class_name}</div>
 									{#each scoreCategories as category, i}
-										<div class="score-cell" class:odd-row={i % 2 === 0}>{s[category.key]}</div>
+										<div class="score-cell" class:odd-row={i % 2 === 0} class:rank-cell={category.key === 'current_rank'}>
+											{#if category.key === 'current_rank'}
+												<span class="rank-badge rank-{s[category.key]}">{s[category.key]}位</span>
+											{:else}
+												{s[category.key]}
+											{/if}
+										</div>
 									{/each}
 								</div>
 							{/each}
@@ -844,6 +895,54 @@
 	.score-cell { padding: 10px; text-align: center; border-bottom: 1px solid #ddd; min-width: 150px; }
 	.score-column .score-cell { min-width: auto; }
 	.score-cell.odd-row { background-color: #f9f9f9; }
+
+	/* 順位表示のスタイル */
+	.rank-cell {
+		text-align: center;
+		padding: 8px !important;
+	}
+
+	.rank-badge {
+		display: inline-block;
+		padding: 0.3rem 0.6rem;
+		border-radius: 12px;
+		font-weight: bold;
+		color: white;
+		font-size: 0.85rem;
+		min-width: 40px;
+	}
+
+	.rank-badge.rank-1 {
+		background: linear-gradient(135deg, #ffd700, #ffb300);
+		box-shadow: 0 2px 4px rgba(255, 179, 0, 0.3);
+	}
+
+	.rank-badge.rank-2 {
+		background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+		box-shadow: 0 2px 4px rgba(160, 160, 160, 0.3);
+	}
+
+	.rank-badge.rank-3 {
+		background: linear-gradient(135deg, #cd7f32, #b8860b);
+		box-shadow: 0 2px 4px rgba(184, 134, 11, 0.3);
+	}
+
+	.rank-badge.rank-4,
+	.rank-badge.rank-5,
+	.rank-badge.rank-6,
+	.rank-badge.rank-7,
+	.rank-badge.rank-8,
+	.rank-badge.rank-9,
+	.rank-badge.rank-10,
+	.rank-badge.rank-11,
+	.rank-badge.rank-12,
+	.rank-badge.rank-13,
+	.rank-badge.rank-14,
+	.rank-badge.rank-15,
+	.rank-badge.rank-16 {
+		background: linear-gradient(135deg, #6c757d, #5a6268);
+		box-shadow: 0 2px 4px rgba(90, 98, 104, 0.3);
+	}
 
 	/* Match/Relay Input Cards */
 	.tournament-edit-card, .relay-input-card { background: #f8f9fa; border-radius: 12px; box-shadow: 0 2px 8px rgba(66,133,244,0.08); padding: 2rem; margin-bottom: 2rem; width: 100%; max-width: 800px; }
