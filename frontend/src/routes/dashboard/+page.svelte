@@ -531,6 +531,13 @@
 
 	// スコアデータに順位を追加
 	$: scoresWithRanks = scores.length > 0 ? calculateRanks(scores) : [];
+
+	let showTotalScores = (typeof window !== 'undefined' && localStorage.getItem('showTotalScores')) === 'false' ? false : true;
+
+	// A reactive statement to update localStorage whenever the switch is toggled.
+	$: if (typeof window !== 'undefined') {
+    	localStorage.setItem('showTotalScores', String(showTotalScores));
+	}
 </script>
 
 <div class="dashboard-container">
@@ -609,39 +616,54 @@
 			{/if}
 
 		{:else if activeTab === 'scores'}
-			<div class="scores-area">
-				<h2>現在の得点</h2>
-				{#if scoresLoading}
-					<p>読み込み中...</p>
-				{:else if scores.length > 0}
-					<div class="scores-container">
-						<div class="score-category-column">
-							<div class="score-header">得点項目</div>
-							{#each scoreCategories as category, i}
-								<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
-							{/each}
-						</div>
-						<div class="scores-data-wrapper">
-							{#each scoresWithRanks as s}
-								<div class="score-column">
-									<div class="score-header">{s.class_name}</div>
-									{#each scoreCategories as category, i}
-										<div class="score-cell" class:odd-row={i % 2 === 0} class:rank-cell={category.key === 'current_rank'}>
-											{#if category.key === 'current_rank'}
-												<span class="rank-badge rank-{s[category.key]}">{s[category.key]}位</span>
-											{:else}
-												{s[category.key]}
-											{/if}
-										</div>
-									{/each}
-								</div>
-							{/each}
-						</div>
-					</div>
-				{:else}
-					<p>スコアデータがありません。</p>
-				{/if}
-			</div>
+    	<div class="scores-area">
+        	<h2>現在の得点</h2>
+        
+        	{#if userRole === 'superroot'}
+            	<div class="visibility-switcher">
+                	<span>合計・順位の表示:</span>
+                	<label class="switch">
+                    	<input type="checkbox" bind:checked={showTotalScores}>
+                    	<span class="slider"></span>
+                	</label>
+                	<span>{showTotalScores ? '表示中' : '非表示'}</span>
+            	</div>
+        	{/if}
+        	{#if scoresLoading}
+            	<p>読み込み中...</p>
+        	{:else if scores.length > 0}
+            	<div class="scores-container">
+                	<div class="score-category-column">
+                    	<div class="score-header">得点項目</div>
+                    	{#each scoreCategories as category, i}
+                        	{#if showTotalScores || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
+                            	<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
+                        	{/if}
+                    	{/each}
+                	</div>
+                	<div class="scores-data-wrapper">
+                    	{#each scoresWithRanks as s}
+                        	<div class="score-column">
+                            	<div class="score-header">{s.class_name}</div>
+                            	{#each scoreCategories as category, i}
+                                	{#if showTotalScores || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
+                                    	<div class="score-cell" class:odd-row={i % 2 === 0} class:rank-cell={category.key === 'current_rank'}>
+                                        	{#if category.key === 'current_rank'}
+                                            	<span class="rank-badge rank-{s[category.key]}">{s[category.key]}位</span>
+                                        	{:else}
+                                            	{s[category.key]}
+                                        	{/if}
+                                    	</div>
+                                	{/if}
+                            	{/each}
+                	        </div>
+                    	{/each}
+                	</div>
+            	</div>
+        	{:else}
+            	<p>スコアデータがありません。</p>
+        	{/if}
+    	</div>
 
 		{:else if activeTab === 'input'}
 			<div class="match-input-area">
