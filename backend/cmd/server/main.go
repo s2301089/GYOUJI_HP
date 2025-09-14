@@ -93,6 +93,7 @@ func initializeUsers(db *sql.DB) {
 		{"username": os.Getenv("ADMIN_VOLLEYBALL_USER"), "password": os.Getenv("ADMIN_VOLLEYBALL_PASS"), "role": "admin", "assigned_sport": "volleyball"},
 		{"username": os.Getenv("ADMIN_SOCCER_USER"), "password": os.Getenv("ADMIN_SOCCER_PASS"), "role": "admin", "assigned_sport": "soccer"},
 		{"username": os.Getenv("STUDENT_USER"), "password": os.Getenv("STUDENT_PASS"), "role": "student", "assigned_sport": ""},
+		{"username": os.Getenv("ADMIN_RELAY_USER"), "password": os.Getenv("ADMIN_RELAY_PASS"), "role": "admin", "assigned_sport": "relay"},
 	}
 
 	for _, user := range users {

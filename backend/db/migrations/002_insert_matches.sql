@@ -9,7 +9,9 @@ INSERT INTO tournaments (name, sport, weather_condition) VALUES
 ('卓球（雨天時）', 'table_tennis', 'rainy'),
 ('卓球（雨天時・敗者戦左側）', 'table_tennis', 'rainy'),
 ('卓球（雨天時・敗者戦右側）', 'table_tennis', 'rainy'),
-('8人制サッカー', 'soccer', 'any');
+('8人制サッカー', 'soccer', 'any'),
+('学年対抗リレーAブロック', 'relay', 'any'),
+('学年対抗リレーBブロック', 'relay', 'any');
 
 -- ----------------------------------------------------------------
 -- 2. バレーボール: チームと試合の登録 (P.8参照)

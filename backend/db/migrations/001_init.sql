@@ -60,5 +60,8 @@ CREATE TABLE team_points (
   soccer2_score INT DEFAULT 0,
   soccer3_score INT DEFAULT 0,
   soccer_championship_score INT DEFAULT 0,
+  relay_A_score INT DEFAULT 0,
+  relay_B_score INT DEFAULT 0,
+  relay_bonus_score INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

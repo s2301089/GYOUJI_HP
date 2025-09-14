@@ -17,6 +17,9 @@ type ScoreBreakdown struct {
 	Soccer2Score                 int    `json:"soccer2_score"`
 	Soccer3Score                 int    `json:"soccer3_score"`
 	SoccerChampionshipScore      int    `json:"soccer_championship_score"`
+	RelayAScore                  int    `json:"relay_A_score"`
+	RelayBScore                  int    `json:"relay_B_score"`
+	RelayBonusScore              int    `json:"relay_bonus_score"`
 	TotalExcludingInit           int    `json:"total_excluding_init"`
 	TotalIncludingInit           int    `json:"total_including_init"`
 }

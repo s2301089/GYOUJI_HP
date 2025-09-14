@@ -25,17 +25,14 @@ func TestScoreHandler_GetScores_OK(t *testing.T) {
 	// 準備: ハンドラにモックサービスを注入
 	svc := &mockScoreService{resp: []model.ScoreBreakdown{
 		{
-			ClassName:           "IE4",
-			InitScore:           5,
-			AttendanceScore:     8,
-			WinPoints:           20,
-			FinalWinnerBonus:    80,
-			FinalRunnerupBonus:  0,
-			BronzeWinnerBonus:   0,
-			BronzeRunnerupBonus: 0,
-			RainyLoserChampion:  10,
-			TotalExcludingInit:  118,
-			TotalIncludingInit:  123,
+			ClassName:                   "IE4",
+			InitScore:                   5,
+			AttendanceScore:             8,
+			Volleyball1Score:            20,
+			VolleyballChampionshipScore: 80,
+			TableTennisRainyBonusScore:  10,
+			TotalExcludingInit:          118,
+			TotalIncludingInit:          123,
 		},
 	}}
 	h := handler.NewScoreHandler(nil)
