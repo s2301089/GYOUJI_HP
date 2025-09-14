@@ -79,7 +79,12 @@ func main() {
 	scoreService := service.NewScoreService(scoreRepository)
 	scoreHandler := handler.NewScoreHandler(scoreService)
 
-	r := router.SetupRouter(userHandler, tournamentHandler, matchHandler, jwtSecret, scoreHandler)
+	// Relay用DI
+	relayRepository := repository.NewRelayRepository(db)
+	relayService := service.NewRelayService(relayRepository)
+	relayHandler := handler.NewRelayHandler(relayService)
+
+	r := router.SetupRouter(userHandler, tournamentHandler, matchHandler, jwtSecret, scoreHandler, relayHandler)
 	log.Println("Server is running on port 8080")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("failed to run server: %v", err)

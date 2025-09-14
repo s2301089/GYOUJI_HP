@@ -1,1 +1,16 @@
-INSERT INTO team_points (class_id) SELECT class_id FROM teams WHERE tournament_id = 1;
+-- 新しいclass_id構造に対応したteam_pointsデータの挿入
+-- class_id構造: 1年生=11,12,13, 2年生=21,22,23, 3年生=31,32,33, 4年生=41,42,43, 5年生=51,52,53, 専・教=6
+
+INSERT IGNORE INTO team_points (class_id) VALUES
+-- 1年生
+(11), (12), (13),
+-- 2年生  
+(21), (22), (23),
+-- 3年生
+(31), (32), (33),
+-- 4年生
+(41), (42), (43),
+-- 5年生
+(51), (52), (53),
+-- 専・教
+(6);

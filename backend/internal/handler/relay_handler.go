@@ -5,107 +5,103 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/model"
-	"github.com/saku0512/GYOUJI_HP/backend/internal/repository"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/service"
 )
 
-var RelayService service.RelayService
-
-func InitRelayService(repo *repository.RelayRepository) {
-	RelayService = service.NewRelayService(repo)
+type RelayHandler struct {
+	service service.RelayService
 }
 
-// GetRelayScores 学年対抗リレーの得点・結果取得API
-// @Summary 学年対抗リレーの得点・順位取得
+func NewRelayHandler(s service.RelayService) *RelayHandler {
+	return &RelayHandler{service: s}
+}
+
+// GetRelayRankings リレーの指定されたブロックの順位を取得
+// @Summary リレーブロックの順位取得
+// @Description 指定されたブロック（A or B）のリレー順位を取得します
 // @Tags relay
-// @Param relay_type query string true "リレー種別 (A or B)"
-// @Success 200 {array} model.RelayResult
+// @Param block query string true "リレーブロック (A or B)"
+// @Success 200 {object} model.RelayRankResponse
 // @Failure 400 {object} map[string]string
-// @Failure 401 {object} map[string]string
-// @Failure 403 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/relay [get]
-func GetRelayScores(c *gin.Context) {
-	// 認証ユーザー情報取得
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+func (h *RelayHandler) GetRelayRankings(c *gin.Context) {
+	block := c.Query("block")
+	if block == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "block parameter is required"})
 		return
 	}
-	userMap, ok := user.(map[string]interface{})
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	role, _ := userMap["role"].(string)
-	username, _ := userMap["username"].(string)
-	assignedSport, _ := userMap["assigned_sport"].(string)
-	// superrootまたはadmin_relayのみ許可
-	if !(role == "superroot" || (role == "admin" && username == "admin_relay" && assignedSport == "relay")) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-	relayType := c.Query("relay_type") // 'A' or 'B'
-	if relayType != "A" && relayType != "B" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "relay_type must be 'A' or 'B'"})
-		return
-	}
-	results, err := RelayService.GetRelayResults(relayType)
+
+	rankings, err := h.service.GetRelayRankings(block)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, results)
+
+	response := model.RelayRankResponse{
+		Block:    block,
+		Rankings: rankings,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
-// 学年対抗リレーの得点・結果登録API
-// PostRelayScores 学年対抗リレーの得点・結果登録API
-// @Summary 学年対抗リレーの得点・順位登録
+// RegisterRelayRankings リレーの指定されたブロックの順位を登録
+// @Summary リレーブロックの順位登録
+// @Description 指定されたブロック（A or B）のリレー順位を登録します
 // @Tags relay
-// @Param body body RelayRegisterRequest true "順位順のclass_id配列とリレー種別"
+// @Param block query string true "リレーブロック (A or B)"
+// @Param body body model.RelayRankRequest true "順位データ"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/relay [post]
-func PostRelayScores(c *gin.Context) {
-	// 認証ユーザー情報取得
+func (h *RelayHandler) RegisterRelayRankings(c *gin.Context) {
+	// 認証チェック
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
+
 	userMap, ok := user.(map[string]interface{})
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
+
 	role, _ := userMap["role"].(string)
 	username, _ := userMap["username"].(string)
 	assignedSport, _ := userMap["assigned_sport"].(string)
-	// superrootまたはadmin_relayのみ許可
+
+	// 権限チェック（superrootまたはadmin_relayのみ）
 	if !(role == "superroot" || (role == "admin" && username == "admin_relay" && assignedSport == "relay")) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: only superroot or admin_relay can register relay rankings"})
 		return
 	}
-	var req model.RelayRegisterRequest
+
+	// ブロックパラメータの取得
+	block := c.Query("block")
+	if block == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "block parameter is required"})
+		return
+	}
+
+	// リクエストボディの解析
+	var req model.RelayRankRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	if req.RelayType != "A" && req.RelayType != "B" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "relay_type must be 'A' or 'B'"})
-		return
-	}
-	if len(req.ClassIDs) != 6 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "class_ids must be 6 items (順位順)"})
-		return
-	}
-	err := RelayService.RegisterRelayResults(req.RelayType, req.ClassIDs)
+
+	// 順位を登録
+	err := h.service.RegisterRelayRankings(block, req.Rankings)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "登録完了"})
+
+	c.JSON(http.StatusOK, gin.H{"message": "relay rankings registered successfully"})
 }

@@ -1,14 +1,260 @@
 <script>
 	import { goto } from '$app/navigation';
-	import { getAllContexts, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { createBracket } from 'bracketry';
-	import { onMount } from 'svelte';
+	import RelayTable from '../../lib/RelayTable.svelte';
+	import { dndzone } from 'svelte-dnd-action';
 
-	// 卓球天候切替用（スライド式）
+	// --- State Variables ---
+
+	// General
+	let userRole = '';
+	let assignedSport = '';
+	let activeTab = 'tournament'; // 'tournament' | 'input' | 'scores'
+	let isLoading = false;
+	let classNameMap = {};
+
+	// 学年名のマッピング
+	const gradeNames = {
+		1: '1年生',
+		2: '2年生', 
+		3: '3年生',
+		4: '4年生',
+		5: '5年生',
+		6: '専・教'
+	};
+
+	// Tournament
+	let allTournaments = [];
+	let selectedTournament = null;
+	let bracketContainer;
+	let selectedSport = '';
 	let tableTennisWeather = (typeof window !== 'undefined' && localStorage.getItem('tableTennisWeather')) || 'sunny';
 	let isRainyChecked = false;
-	$: isRainyChecked = tableTennisWeather === 'rainy';
 
+	// Match Input
+	let matchesBySport = {};
+	let matchesLoading = false;
+	let showConfirmModal = false;
+	let editingMatch = null;
+	let editingSport = '';
+	let activeInputTab = 'tournament'; // 'tournament' | 'relay'
+
+	// Score
+	let scores = [];
+	let scoresLoading = false;
+
+	// Relay
+	let relayActive = false; // For tournament tab's relay view
+	let relayType = 'A';
+	let relayResults = [];
+	let relayLoading = false;
+	let relayError = '';
+	let relayUpdateStatus = ''; // 'success' | 'error' | ''
+
+
+	// --- Lifecycle & Initialisation ---
+
+	import { onMount } from 'svelte';
+	onMount(async () => {
+		await fetchUser();
+		await fetchTournament('volleyball');
+		await fetchClassNameMap();
+	});
+
+	async function fetchUser() {
+		const token = localStorage.getItem('token');
+		if (token) {
+			try {
+				const res = await fetch('/api/auth/me', {
+					headers: { Authorization: `Bearer ${token}` }
+				});
+				if (res.ok) {
+					const user = await res.json();
+					userRole = user.role || '';
+					assignedSport = user.assigned_sport || '';
+				}
+			} catch (e) {
+				console.error('Failed to fetch user', e);
+			}
+		}
+	}
+
+	function logout() {
+		localStorage.removeItem('token');
+		goto('/login');
+	}
+
+
+	// --- Data Fetching ---
+
+	async function fetchTournament(sport) {
+		selectedSport = sport;
+		isLoading = true;
+		allTournaments = [];
+		selectedTournament = null;
+		const token = localStorage.getItem('token');
+		try {
+			let url = `/api/tournaments/${sport}`;
+			if (sport === 'table_tennis') {
+				url += `?weather=${tableTennisWeather}`;
+			}
+			const res = await fetch(url, {
+				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (data && data.length > 0) {
+					allTournaments = data;
+					selectTournament(allTournaments[0]);
+				} else {
+					allTournaments = [];
+				}
+			} else {
+				alert('トーナメント情報の取得に失敗しました。');
+			}
+		} catch (error) {
+			console.error('Fetch error:', error);
+			alert('サーバーとの通信に失敗しました。');
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	async function fetchMatches(sport) {
+		matchesLoading = true;
+		const token = localStorage.getItem('token');
+		try {
+			let url = `/api/matches/${sport}`;
+			if (sport === 'table_tennis') {
+				url += `?weather=${tableTennisWeather}`;
+			}
+			const res = await fetch(url, {
+				headers: { Authorization: `Bearer ${token}` }
+			});
+			if (res.ok) {
+				matchesBySport[sport] = await res.json();
+			} else {
+				matchesBySport[sport] = [];
+			}
+		} catch (e) {
+			matchesBySport[sport] = [];
+		} finally {
+			matchesLoading = false;
+		}
+	}
+
+	async function fetchScores() {
+		scoresLoading = true;
+		const token = localStorage.getItem('token');
+		const classOrder = ['1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2', 'IS3', 'IT3', 'IE3', 'IS4', 'IT4', 'IE4', 'IS5', 'IT5', 'IE5', '専・教'];
+		try {
+			const res = await fetch('/api/score', {
+				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			});
+			if (res.ok) {
+				let fetchedScores = await res.json();
+				fetchedScores.sort((a, b) => {
+                    const indexA = classOrder.indexOf(a.class_name);
+                    const indexB = classOrder.indexOf(b.class_name);
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                });
+				scores = fetchedScores;
+			}
+		} catch (e) {
+			scores = [];
+		} finally {
+			scoresLoading = false;
+		}
+	}
+
+	async function fetchRelayResults(type) {
+		relayLoading = true;
+		relayError = '';
+		relayType = type;
+		const token = localStorage.getItem('token');
+		try {
+			const res = await fetch(`/api/relay?block=${type}`, {
+				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			});
+			if (res.ok) {
+				let data = await res.json();
+				
+				// 新しいAPIレスポンス形式に対応
+				if (data && data.rankings && Object.keys(data.rankings).length > 0) {
+					// rankings: {1: 3, 2: 1, 3: 5, 4: 2, 5: 4, 6: 6} の形式
+					// 順位 -> 学年のマッピングを順位順のリストに変換
+					const formattedData = Object.entries(data.rankings)
+						.sort(([rankA], [rankB]) => parseInt(rankA) - parseInt(rankB))
+						.map(([rank, grade]) => ({
+							id: `relay-${type}-${rank}-${grade}-${Date.now()}`, // より一意なID
+							rank: parseInt(rank),
+							grade: parseInt(grade),
+							relay_type: type
+						}));
+					relayResults = formattedData;
+				} else {
+					// データがない場合の処理
+					if (userRole === 'superroot' || userRole === 'admin_relay') {
+						// 管理者の場合は編集用のデフォルトデータを作成
+						relayResults = [1, 2, 3, 4, 5, 6].map(rank => ({
+							id: `relay-${type}-${rank}-${Date.now()}`, // より一意なID
+							rank: rank,
+							grade: rank, // デフォルトで順番通り
+							relay_type: type
+						}));
+					} else {
+						// 一般ユーザーの場合は空のデータ（学年なし）を作成
+						relayResults = [1, 2, 3, 4, 5, 6].map(rank => ({
+							id: `relay-${type}-${rank}-${Date.now()}`,
+							rank: rank,
+							grade: null, // 学年は空
+							relay_type: type
+						}));
+					}
+				}
+			} else {
+				relayError = 'リレー結果の取得に失敗しました';
+			}
+		} catch (e) {
+			console.error("Fetch error:", e);
+			relayError = 'サーバー通信エラー、またはデータの形式が不正です。';
+		} finally {
+			relayLoading = false;
+		}
+	}
+
+	async function fetchClassNameMap() {
+		try {
+			const res = await fetch('/api/score');
+			if (res.ok) {
+				const scoresData = await res.json();
+				classNameMap = scoresData.reduce((acc, s) => {
+					acc[s.class_id] = s.class_name;
+					return acc;
+				}, {});
+			}
+		} catch {}
+	}
+
+
+	// --- UI Logic & Event Handlers ---
+
+	function handleInputTabClick() {
+		activeTab = 'input';
+		if (userRole === 'admin_relay') {
+			activeInputTab = 'relay';
+			fetchRelayResults(relayType);
+		} else {
+			activeInputTab = 'tournament';
+			const sports = userRole === 'superroot' ? ['volleyball', 'table_tennis', 'soccer'] : (assignedSport ? [assignedSport] : []);
+			sports.forEach(fetchMatches);
+		}
+	}
+
+	$: isRainyChecked = tableTennisWeather === 'rainy';
 	$: {
         if (typeof window !== 'undefined') {
             localStorage.setItem('tableTennisWeather', tableTennisWeather);
@@ -21,178 +267,129 @@
 		fetchMatches('table_tennis');
 	}
 
-	// 卓球試合入力用フィルタ
 	function getFilteredTableTennisMatches() {
+		const allTableTennisMatches = matchesBySport['table_tennis'] ?? [];
 		if (tableTennisWeather === 'sunny') {
-			return matchesBySport['table_tennis']?.filter(m => m.tournament_name === '卓球（晴天時）') ?? [];
-		} else {
-			return matchesBySport['table_tennis']?.filter(m => m.tournament_name === '卓球（雨天時）' || m.tournament_name === '卓球（雨天時・敗者戦左側）' || m.tournament_name === '卓球（雨天時・敗者戦右側）') ?? [];
+			return allTableTennisMatches.filter(m => m.tournament_name === '卓球（晴天時）');
 		}
+		return allTableTennisMatches.filter(m => m.tournament_name.startsWith('卓球（雨天時）'));
 	}
 
-
-	let allTournaments = [];
-	let selectedTournament = null;
-	let bracketContainer;
-	let isLoading = false;
-	let selectedSport = '';
-
-	// タブ管理
-	let activeTab = 'tournament'; // 'tournament' | 'input' | 'scores'
-
-	// ユーザー情報（localStorageのtokenからデコードするか、APIで取得する想定）
-	let userRole = '';
-	let assignedSport = '';
-
-
-	onMount(async () => {
-		// ユーザー情報をAPIから取得
-		const token = localStorage.getItem('token');
-		if (token) {
-			try {
-				const res = await fetch('/api/auth/me', {
-					headers: { Authorization: `Bearer ${token}` }
-				});
-				if (res.ok) {
-					const user = await res.json();
-					userRole = user.role || '';
-					assignedSport = user.assigned_sport || '';
-					console.log('userRole:', userRole);
-					console.log('assignedSport:', assignedSport);
-				} else {
-					userRole = '';
-					assignedSport = '';
-				}
-			} catch (e) {
-				userRole = '';
-				assignedSport = '';
-			}
-		}
-		fetchTournament('volleyball');
-	});
-
-	function logout() {
-		localStorage.removeItem('token');
-		goto('/login');
-	}
-
-	async function fetchTournament(sport) {
-		selectedSport = sport;
-		isLoading = true;
-		allTournaments = [];
-		selectedTournament = null;
-
-		const token = localStorage.getItem('token');
-		try {
-			let url = `/api/tournaments/${sport}`;
-			if (sport === 'table_tennis') {
-				url += `?weather=${tableTennisWeather}`;
-			}
-			const res = await fetch(url, {
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
-			});
-			console.log(res);
-
-			if (res.ok) {
-				const data = await res.json();
-				if (data && data.length > 0) {
-					allTournaments = data; // APIからのレスポンスをそのまま格納
-					console.log(allTournaments);
-					selectTournament(allTournaments[0]); // 最初のトーナメントをデフォルトで表示
-				} else {
-					allTournaments = []; // データがない場合は空にする
-					alert('この競技のトーナメント情報が見つかりませんでした。');
-				}
-			} else {
-				alert('トーナメント情報の取得に失敗しました。');
-			}
-		} catch (error) {
-			console.error('Fetch error:', error);
-			alert('サーバーとの通信に失敗しました。');
-		} finally {
-			isLoading = false;
-		}
-	}
-	
-
-	// 卓球トーナメント表示用フィルタ
 	function getFilteredTableTennisTournaments() {
 		if (tableTennisWeather === 'sunny') {
 			return allTournaments.filter(t => t.name === '卓球（晴天時）');
-		} else {
-			return allTournaments.filter(t => t.name === '卓球（雨天時）' || t.name === '卓球（雨天時・敗者戦左側）' || t.name === '卓球（雨天時・敗者戦右側）');
 		}
+		return allTournaments.filter(t => t.name.startsWith('卓球（雨天時）'));
 	}
 
-	// 表示するトーナメントを選択する関数
 	function selectTournament(tournamentData) {
 		selectedTournament = tournamentData;
 		tick().then(drawBracket);
 	}
 
-	// bracketryライブラリを呼び出してトーナメント表を描画する関数
 	async function drawBracket() {
 		if (!selectedTournament || !bracketContainer) return;
-		
-		// 描画前に中身をクリア
 		bracketContainer.innerHTML = '';
-        
-		// DOMが確実に存在することを保証
 		await tick();
-
-		// 整形済みのデータをそのままライブラリに渡す
 		createBracket(selectedTournament, bracketContainer);
 	}
 
-	// ダッシュボード初期表示時にバレーボールのトーナメントを表示
-	onMount(() => {
-		fetchTournament('volleyball');
-	});
 
-	// 試合一覧（競技ごと）
-	let matchesBySport = {};
-	let matchesLoading = false;
+	// --- API Updates ---
 
-	// スコア一覧
-	let scores = [];
-	let scoresLoading = false;
-
-	async function fetchScores() {
-		scoresLoading = true;
+	async function updateMatchScore(match, sport) {
 		const token = localStorage.getItem('token');
-		const classOrder = [
-			'1-1', '1-2', '1-3', 
-			'IS2', 'IT2', 'IE2', 
-			'IS3', 'IT3', 'IE3', 
-			'IS4', 'IT4', 'IE4', 
-			'IS5', 'IT5', 'IE5', 
-			'専・教'
-		];
+		const body = {
+			user: userRole,
+			team1_score: match.team1_score,
+			team2_score: match.team2_score,
+			winner_team_id: match.team1_score > match.team2_score ? match.team1_id : (match.team2_score > match.team1_score ? match.team2_id : null),
+			status: 'finished'
+		};
 		try {
-			const res = await fetch('/api/score', {
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			const res = await fetch(`/api/matches/${match.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+				body: JSON.stringify(body)
+			});
+			match._updateStatus = res.ok ? 'success' : 'error';
+		} catch (e) {
+			match._updateStatus = 'error';
+		}
+		setTimeout(() => { match._updateStatus = ''; }, 2000);
+		await fetchMatches(sport);
+		if (sport === 'table_tennis') {
+			matchesBySport['table_tennis'] = [...(matchesBySport['table_tennis'] ?? [])];
+		}
+	}
+
+	function confirmUpdateMatchScore() {
+		if (editingMatch && editingSport) {
+			updateMatchScore(editingMatch, editingSport);
+		}
+		showConfirmModal = false;
+		editingMatch = null;
+		editingSport = '';
+	}
+
+	function handleDndConsider(event) {
+		// ドラッグ中の一時的な状態更新
+		if (event.detail.items && Array.isArray(event.detail.items)) {
+			relayResults = event.detail.items.map((item, index) => ({
+				...item,
+				rank: index + 1 // 順位を更新
+			}));
+		}
+	}
+
+	function handleDndFinalize(event) {
+		// ドロップ完了時の最終状態更新
+		if (event.detail.items && Array.isArray(event.detail.items)) {
+			relayResults = event.detail.items.map((item, index) => ({
+				...item,
+				rank: index + 1 // 順位を更新
+			}));
+		}
+	}
+
+	async function updateRelayRanks() {
+		relayUpdateStatus = 'loading';
+		const token = localStorage.getItem('token');
+
+		if (relayResults.length !== 6) {
+			alert('リレーのクラス数が6ではありません。');
+			relayUpdateStatus = '';
+			return;
+		}
+
+		// 新しいAPI形式に合わせて順位 -> 学年のマッピングを作成
+		const rankings = {};
+		relayResults.forEach((result, index) => {
+			rankings[index + 1] = result.grade; // 順位(1-6) -> 学年(1-6)
+		});
+
+		const body = { rankings };
+
+		try {
+			const res = await fetch(`/api/relay?block=${relayType}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+				body: JSON.stringify(body)
 			});
 			if (res.ok) {
-				let fetchedScores = await res.json();
-				fetchedScores.sort((a, b) => {
-                    const indexA = classOrder.indexOf(a.class_name);
-                    const indexB = classOrder.indexOf(b.class_name);
-                    
-                    if (indexA === -1 && indexB === -1) return 0;
-                    if (indexA === -1) return 1;
-                    if (indexB === -1) return -1;
-
-                    return indexA - indexB;
-                });
-				scores = fetchedScores;
+				relayUpdateStatus = 'success';
+				await fetchRelayResults(relayType);
 			} else {
-				scores = [];
+				const errorData = await res.json();
+				alert(`更新に失敗しました: ${errorData.error}`);
+				relayUpdateStatus = 'error';
 			}
 		} catch (e) {
-			scores = [];
-		} finally {
-			scoresLoading = false;
+			console.error('Relay update error:', e);
+			alert('サーバーとの通信に失敗しました。');
+			relayUpdateStatus = 'error';
 		}
+		setTimeout(() => { relayUpdateStatus = ''; }, 3000);
 	}
 
 	const scoreCategories = [
@@ -211,88 +408,12 @@
         { name: 'サッカー2勝点', key: 'soccer2_score' },
         { name: 'サッカー3勝点', key: 'soccer3_score' },
         { name: 'サッカー優勝点', key: 'soccer_championship_score' },
+        { name: 'リレーAブロック得点', key: 'relay_A_score' },
+        { name: 'リレーBブロック得点', key: 'relay_B_score' },
+        { name: 'リレーボーナス得点', key: 'relay_bonus_score' },
         { name: '合計(春スポ体合計点除く)', key: 'total_excluding_init' },
         { name: '合計(春スポ体合計点含む)', key: 'total_including_init' },
     ];
-
-	// モーダル制御用
-	let showConfirmModal = false;
-	let editingMatch = null;
-	let editingSport = '';
-
-	// 試合一覧取得API
-	async function fetchMatches(sport) {
-		matchesLoading = true;
-		const token = localStorage.getItem('token');
-		try {
-			let url = `/api/matches/${sport}`;
-			if (sport === 'table_tennis') {
-				url += `?weather=${tableTennisWeather}`;
-			}
-			const res = await fetch(url, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			if (res.ok) {
-				const data = await res.json();
-				matchesBySport[sport] = data;
-				console.log(matchesBySport);
-			} else {
-				matchesBySport[sport] = [];
-			}
-		} catch (e) {
-			matchesBySport[sport] = [];
-		} finally {
-			matchesLoading = false;
-		}
-	}
-
-	// 試合スコア更新API（スコア更新後に再取得）
-	async function updateMatchScore(match, sport) {
-		const token = localStorage.getItem('token');
-		const body = {
-			user: userRole,
-			team1_score: match.team1_score,
-			team2_score: match.team2_score,
-			winner_team_id: match.team1_score > match.team2_score ? match.team1_id : (match.team2_score > match.team1_score ? match.team2_id : null),
-			status: 'finished'
-		};
-		try {
-			const res = await fetch(`/api/matches/${match.id}`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`
-				},
-				body: JSON.stringify(body)
-			});
-			if (res.ok) {
-				match._updateStatus = 'success';
-			} else {
-				match._updateStatus = 'error';
-			}
-		} catch (e) {
-			match._updateStatus = 'error';
-		}
-		setTimeout(() => { match._updateStatus = ''; }, 2000);
-		// 更新後に再取得
-		await fetchMatches(sport);
-		// 卓球のみ配列自体を再代入してUIを強制更新
-		if (sport === 'table_tennis') {
-			matchesBySport['table_tennis'] = [...(matchesBySport['table_tennis'] ?? [])];
-		}
-	}
-
-	// モーダルから呼ばれる確認用関数
-	function confirmUpdateMatchScore() {
-		console.log(editingMatch)
-		console.log(editingSport)
-		if (editingMatch && editingSport) {
-			updateMatchScore(editingMatch, editingSport);
-		}
-		showConfirmModal = false;
-		editingMatch = null;
-		editingSport = '';
-	}
 </script>
 
 <div class="dashboard-container">
@@ -300,27 +421,22 @@
 		<h1>ダッシュボード</h1>
 		<nav class="dashboard-tabs">
 			<button class:active={activeTab === 'tournament'} on:click={() => { activeTab = 'tournament'; fetchTournament('volleyball'); }}>競技トーナメント</button>
-			<button class:active={activeTab === 'scores'} on:click={async () => { activeTab = 'scores'; await fetchScores(); }}>現在の得点</button>
-			{#if userRole === 'superroot' || userRole === 'admin'}
-				<button class:active={activeTab === 'input'} on:click={async () => {
-					activeTab = 'input';
-					let sports = userRole === 'superroot' ? ['volleyball', 'table_tennis', 'soccer'] : [assignedSport];
-					for (const sport of sports) {
-						await fetchMatches(sport);
-					}
-				}}>試合結果入力</button>
+			<button class:active={activeTab === 'scores'} on:click={() => { activeTab = 'scores'; fetchScores(); }}>現在の得点</button>
+			{#if userRole === 'superroot' || userRole === 'admin' || userRole === 'admin_relay'}
+				<button class:active={activeTab === 'input'} on:click={handleInputTabClick}>試合結果入力</button>
 			{/if}
 		</nav>
 		<button class="logout-btn" on:click={logout}>ログアウト</button>
 	</header>
+
 	<main>
 		{#if activeTab === 'tournament'}
-			<p>ようこそ！</p>
 			<div class="sports-buttons">
-				<button on:click={() => fetchTournament('volleyball')} class:active={selectedSport === 'volleyball'}>バレーボール</button>
-				<button on:click={() => fetchTournament('table_tennis')} class:active={selectedSport === 'table_tennis'}>卓球</button>
-				<button on:click={() => fetchTournament('soccer')} class:active={selectedSport === 'soccer'}>サッカー</button>
-				{#if (userRole === 'superroot' || (userRole === 'admin' && assignedSport === 'table_tennis')) && selectedSport === 'table_tennis'}
+				<button on:click={() => { relayActive = false; fetchTournament('volleyball'); }} class:active={selectedSport === 'volleyball' && !relayActive}>バレーボール</button>
+				<button on:click={() => { relayActive = false; fetchTournament('table_tennis'); }} class:active={selectedSport === 'table_tennis' && !relayActive}>卓球</button>
+				<button on:click={() => { relayActive = false; fetchTournament('soccer'); }} class:active={selectedSport === 'soccer' && !relayActive}>サッカー</button>
+				<button on:click={() => { relayActive = true; fetchRelayResults('A'); }} class:active={relayActive}>リレー</button>
+				{#if (userRole === 'superroot' || (userRole === 'admin' && assignedSport === 'table_tennis')) && selectedSport === 'table_tennis' && !relayActive}
 				<div class="weather-switcher">
 					<span>卓球トーナメント天候:</span>
 					<label class="switch">
@@ -331,172 +447,241 @@
 				</div>
 				{/if}
 			</div>
-			{#if isLoading}
-				<p>読み込み中...</p>
-			{/if}
-			{#if !isLoading && selectedSport === 'table_tennis'}
-				{#if getFilteredTableTennisTournaments().length > 1}
+			{#if relayActive}
+				<div class="relay-area">
+					<h2>学年対抗リレー結果</h2>
+					<div class="relay-info">
+						<p><strong>得点システム:</strong> 1位30点、2位25点、3位20点、4位15点、5位10点、6位5点</p>
+						<p><strong>ボーナス得点:</strong> 両ブロック合計で1位30点、2位20点、3位10点の追加得点</p>
+					</div>
+					<div class="relay-type-selector">
+						<button on:click={() => fetchRelayResults('A')} class:active={relayType === 'A'}>リレーAブロック</button>
+						<button on:click={() => fetchRelayResults('B')} class:active={relayType === 'B'}>リレーBブロック</button>
+					</div>
+					{#if relayLoading}
+						<p>読み込み中...</p>
+					{:else if relayError}
+						<p style="color:red">{relayError}</p>
+					{:else}
+						<RelayTable {relayResults} {relayType} {classNameMap} />
+					{/if}
+				</div>
+			{:else}
+				{#if isLoading}<p>読み込み中...</p>{/if}
+				{#if !isLoading && selectedSport === 'table_tennis'}
+					{#if getFilteredTableTennisTournaments().length > 1}
+						<div class="tournament-selector">
+							{#each getFilteredTableTennisTournaments() as t}
+								<button on:click={() => selectTournament(t)} class:active={selectedTournament?.name === t.name}>{t.name}</button>
+							{/each}
+						</div>
+					{/if}
+				{:else if !isLoading && allTournaments.length > 1}
 					<div class="tournament-selector">
-						{#each getFilteredTableTennisTournaments() as t}
-							<button on:click={() => selectTournament(t)} class:active={selectedTournament?.name === t.name}>
-								{t.name}
-							</button>
+						{#each allTournaments as t}
+							<button on:click={() => selectTournament(t)} class:active={selectedTournament?.name === t.name}>{t.name}</button>
 						{/each}
 					</div>
 				{/if}
-			{:else if !isLoading && allTournaments.length > 1}
-				<div class="tournament-selector">
-					{#each allTournaments as t}
-						<button on:click={() => selectTournament(t)} class:active={selectedTournament?.name === t.name}>
-							{t.name}
-						</button>
-					{/each}
+				<div class="bracket-area">
+					{#if selectedTournament}
+						<h2>{selectedTournament.name} トーナメント表</h2>
+						<div bind:this={bracketContainer} class="bracket-wrapper"></div>
+					{/if}
 				</div>
 			{/if}
-			<div class="bracket-area">
-				{#if selectedTournament}
-					<h2>{selectedTournament.name} トーナメント表</h2>
-					<div bind:this={bracketContainer} class="bracket-wrapper"></div>
-				{/if}
-			</div>
-		{/if}
 
-		{#if activeTab === 'scores'}
+		{:else if activeTab === 'scores'}
 			<div class="scores-area">
 				<h2>現在の得点</h2>
 				{#if scoresLoading}
 					<p>読み込み中...</p>
-				{:else}
-					{#if scores.length > 0}
-						<div class="scores-container">
-							<div class="score-category-column">
-								<div class="score-header">得点項目</div>
-								{#each scoreCategories as category, i}
-									<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
-								{/each}
-							</div>
-							<div class="scores-data-wrapper">
-								{#each scores as s}
-									<div class="score-column">
-										<div class="score-header">{s.class_name}</div>
-										{#each scoreCategories as category, i}
-											<div class="score-cell" class:odd-row={i % 2 === 0}>{s[category.key]}</div>
-										{/each}
-									</div>
-								{/each}
-							</div>
+				{:else if scores.length > 0}
+					<div class="scores-container">
+						<div class="score-category-column">
+							<div class="score-header">得点項目</div>
+							{#each scoreCategories as category, i}
+								<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
+							{/each}
 						</div>
-					{:else}
-						<p>スコアデータがありません。</p>
-					{/if}
-				{/if}
-			</div>
-		{/if}
-		{#if activeTab === 'input' && (userRole === 'superroot' || userRole === 'admin')}
-			<div class="match-input-area">
-				<h2>試合結果入力</h2>
-				{#if userRole === 'admin'}
-					<p>あなたの担当競技: <b>{assignedSport}</b></p>
-				{/if}
-				{#if userRole === 'superroot'}
-					<p>全競技の試合結果を編集できます</p>
-				{/if}
-				{#if matchesLoading}
-					<p>試合データ取得中...</p>
-				{/if}
-				{#each (userRole === 'superroot' ? ['volleyball', 'table_tennis', 'soccer'] : [assignedSport]) as sport}
-					<div class="tournament-edit-card">
-						<h3>{sport} の試合一覧</h3>
-						<div class="matches-list">
-							{#if sport === 'table_tennis'}
-								{#if getFilteredTableTennisMatches().length > 0}
-									{#each getFilteredTableTennisMatches() as m}
-										{#if m.status !== 'finished'}
-											<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
-												<div class="match-info">
-													<span>試合ID: {m.id}</span>
-													<span>ラウンド: {m.round}</span>
-													<span>トーナメント: {m.tournament_name}</span>
-													<span>チーム: {m.team1_name || '-'} vs {m.team2_name || '-'}</span>
-												</div>
-												<div class="score-inputs">
-													<span>{m.team1_name}</span>
-													<input type="number" min="0" bind:value={m.team1_score} class="score-input"  required/>
-													<span> - </span>
-													<input type="number" min="0" bind:value={m.team2_score} class="score-input" required />
-													<span>{m.team2_name}</span>
-												</div>
-												<button type="submit" class="update-btn">更新</button>
-												{#if m._updateStatus}
-													<span class="update-status {m._updateStatus === 'success' ? 'success' : 'error'}">{m._updateStatus === 'success' ? '更新成功' : '更新失敗'}</span>
-												{/if}
-											</form>
-										{:else}
-											<div class="match-info">
-												<span>試合ID: {m.id}</span>
-												<span>ラウンド: {m.round}</span>
-												<span>トーナメント: {m.tournament_name}</span>
-												<span>チーム: {m.team1_name || '-'} vs {m.team2_name || '-'}</span>
-												<span class="update-status success">試合終了</span>
-											</div>
-										{/if}
+						<div class="scores-data-wrapper">
+							{#each scores as s}
+								<div class="score-column">
+									<div class="score-header">{s.class_name}</div>
+									{#each scoreCategories as category, i}
+										<div class="score-cell" class:odd-row={i % 2 === 0}>{s[category.key]}</div>
 									{/each}
-								{:else}
-									<p>試合データがありません。</p>
-								{/if}
-							{:else}
-								{#if matchesBySport[sport]?.length > 0}
-									{#each matchesBySport[sport] as m}
-										{#if m.status !== 'finished'}
-											<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
-												<div class="match-info">
-													<span>試合ID: {m.id}</span>
-													<span>ラウンド: {m.round}</span>
-													<span>チーム: {m.team1_name || '-'} vs {m.team2_name || '-'}</span>
-												</div>
-												<div class="score-inputs">
-													<span>{m.team1_name}</span>
-													<input type="number" min="0" bind:value={m.team1_score} class="score-input si1"  required/>
-													<span> - </span>
-													<input type="number" min="0" bind:value={m.team2_score} class="score-input si2" required />
-													<span>{m.team2_name}</span>
-												</div>
-												<button type="submit" class="update-btn">更新</button>
-												{#if m._updateStatus}
-													<span class="update-status {m._updateStatus === 'success' ? 'success' : 'error'}">{m._updateStatus === 'success' ? '更新成功' : '更新失敗'}</span>
-												{/if}
-											</form>
-										{:else}
-											<div class="match-info">
-												<span>試合ID: {m.id}</span>
-												<span>ラウンド: {m.round}</span>
-												<span>チーム: {m.team1_name || '-'} vs {m.team2_name || '-'}</span>
-												<span class="update-status success">試合終了</span>
-											</div>
-										{/if}
-									{/each}
-								{:else}
-									<p>試合データがありません。</p>
-								{/if}
-							{/if}
+								</div>
+							{/each}
 						</div>
 					</div>
-				{/each}
+				{:else}
+					<p>スコアデータがありません。</p>
+				{/if}
+			</div>
+
+		{:else if activeTab === 'input'}
+			<div class="match-input-area">
+				<h2>試合結果入力</h2>
+				
+				<div class="input-tabs">
+					{#if userRole === 'superroot' || userRole === 'admin'}
+						<button class:active={activeInputTab === 'tournament'} on:click={() => activeInputTab = 'tournament'}>トーナメント</button>
+					{/if}
+					{#if userRole === 'superroot' || userRole === 'admin_relay'}
+						<button class:active={activeInputTab === 'relay'} on:click={() => { activeInputTab = 'relay'; fetchRelayResults(relayType); }}>リレー</button>
+					{/if}
+				</div>
+
+				{#if activeInputTab === 'tournament'}
+					{#if userRole === 'admin'}<p>あなたの担当競技: <b>{assignedSport}</b></p>{/if}
+					{#if userRole === 'superroot'}<p>全競技の試合結果を編集できます</p>{/if}
+					{#if matchesLoading}<p>試合データ取得中...</p>{/if}
+
+					{#each (userRole === 'superroot' ? ['volleyball', 'table_tennis', 'soccer'] : (assignedSport ? [assignedSport] : [])) as sport}
+						<div class="tournament-edit-card">
+							<h3>{sport} の試合一覧</h3>
+							<div class="matches-list">
+								{#if sport === 'table_tennis'}
+									{#each getFilteredTableTennisMatches() as m (m.id)}
+										<div class="match-entry">
+											{#if m.status !== 'finished'}
+												<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
+													<div class="match-info">
+														<span>ID: {m.id}</span>
+														<span>R: {m.round}</span>
+														<span>{m.tournament_name}</span>
+														<span>{m.team1_name || '-'} vs {m.team2_name || '-'}</span>
+													</div>
+													<div class="score-inputs">
+														<span>{m.team1_name}</span>
+														<input type="number" min="0" bind:value={m.team1_score} class="score-input" required/>
+														<span> - </span>
+														<input type="number" min="0" bind:value={m.team2_score} class="score-input" required />
+														<span>{m.team2_name}</span>
+													</div>
+													<button type="submit" class="update-btn">更新</button>
+													{#if m._updateStatus}
+														<span class="update-status {m._updateStatus}">{m._updateStatus === 'success' ? '✓' : '✗'}</span>
+													{/if}
+												</form>
+											{:else}
+												<div class="match-info finished">
+													<span>ID: {m.id}</span>
+													<span>R: {m.round}</span>
+													<span>{m.tournament_name}</span>
+													<span>{m.team1_name} {m.team1_score} - {m.team2_score} {m.team2_name}</span>
+													<span class="update-status success">試合終了</span>
+												</div>
+											{/if}
+										</div>
+									{:else}
+										<p>試合データがありません。</p>
+									{/each}
+								{:else}
+									{#each matchesBySport[sport] as m (m.id)}
+										<div class="match-entry">
+											{#if m.status !== 'finished'}
+												<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
+													<div class="match-info">
+														<span>ID: {m.id}</span>
+														<span>R: {m.round}</span>
+														<span>{m.team1_name || '-'} vs {m.team2_name || '-'}</span>
+													</div>
+													<div class="score-inputs">
+														<span>{m.team1_name}</span>
+														<input type="number" min="0" bind:value={m.team1_score} class="score-input" required/>
+														<span> - </span>
+														<input type="number" min="0" bind:value={m.team2_score} class="score-input" required />
+														<span>{m.team2_name}</span>
+													</div>
+													<button type="submit" class="update-btn">更新</button>
+													{#if m._updateStatus}
+														<span class="update-status {m._updateStatus}">{m._updateStatus === 'success' ? '✓' : '✗'}</span>
+													{/if}
+												</form>
+											{:else}
+												<div class="match-info finished">
+													<span>ID: {m.id}</span>
+													<span>R: {m.round}</span>
+													<span>{m.tournament_name}</span>
+													<span>{m.team1_name} {m.team1_score} - {m.team2_score} {m.team2_name}</span>
+													<span class="update-status success">試合終了</span>
+												</div>
+											{/if}
+										</div>
+									{:else}
+										<p>試合データがありません。</p>
+									{/each}
+								{/if}
+							</div>
+						</div>
+					{/each}
+
+				{:else if activeInputTab === 'relay'}
+					<div class="relay-input-card">
+						<h3>リレー結果入力 (ドラッグ&ドロップで順位変更)</h3>
+						<div class="relay-type-selector">
+							<button on:click={() => fetchRelayResults('A')} class:active={relayType === 'A'}>リレーA</button>
+							<button on:click={() => fetchRelayResults('B')} class:active={relayType === 'B'}>リレーB</button>
+						</div>
+						{#if relayLoading}
+							<p>読み込み中...</p>
+						{:else if relayError}
+							<p style="color:red;">{relayError}</p>
+						{:else if relayResults.length > 0}
+							<section 
+								class="dnd-list" 
+								use:dndzone={{
+									items: relayResults, 
+									flipDurationMs: 300, 
+									dropTargetStyle: {},
+									dragDisabled: relayLoading || relayUpdateStatus === 'loading'
+								}} 
+								on:consider={handleDndConsider} 
+								on:finalize={handleDndFinalize}
+							>
+								{#each relayResults as result, i (result.id)}
+									<div class="dnd-item" data-id={result.id}>
+										<span class="rank-badge">{result.rank || i + 1}位</span>
+										<span class="class-name">{gradeNames[result.grade] || `学年${result.grade}`}</span>
+									</div>
+								{/each}
+							</section>
+							<button 
+								on:click={updateRelayRanks} 
+								class="update-btn" 
+								disabled={relayUpdateStatus === 'loading'}
+							>
+								{relayUpdateStatus === 'loading' ? '更新中...' : 'リレー結果を更新'}
+							</button>
+							{#if relayUpdateStatus === 'success'}
+								<span class="update-status success">更新しました！</span>
+							{:else if relayUpdateStatus === 'error'}
+								<span class="update-status error">更新に失敗しました。</span>
+							{:else if relayUpdateStatus === 'loading'}
+								<span class="update-status loading">更新中...</span>
+							{/if}
+						{:else}
+							<p>リレーデータがありません。</p>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</main>
+
 	{#if showConfirmModal}
-    	<div class="modal-overlay">
-        	<div class="modal-content">
+    	<div class="modal-overlay" on:click={() => showConfirmModal = false}>
+        	<div class="modal-content" on:click|stopPropagation>
             	<h3>試合結果を更新しますか？</h3>
-				<p>試合ID: {editingMatch.id}</p>
-				<p>ラウンド: {editingMatch.round}</p>
-				<p>チーム: {editingMatch.team1_name || '-'} vs {editingMatch.team2_name || '-'}</p>
+				<p>ID: {editingMatch.id}, R: {editingMatch.round}</p>
+				<p>{editingMatch.team1_name || '-'} vs {editingMatch.team2_name || '-'}</p>
 				<p>スコア: {editingMatch.team1_score} - {editingMatch.team2_score}</p>
             	<p>本当にこの内容で更新してよろしいですか？</p>
             	<div class="modal-actions">
-                	<button on:click={() => { showConfirmModal = false; editingMatch = null; editingSport = ''; }} class="update-btn" style="background:#ccc;color:#333;">キャンセル</button>
-					<button on:click={confirmUpdateMatchScore} class="update-btn">OK</button>
+                	<button on:click={() => { showConfirmModal = false; editingMatch = null; editingSport = ''; }}>キャンセル</button>
+					<button on:click={confirmUpdateMatchScore} class="ok-btn">OK</button>
             	</div>
         	</div>
     	</div>
@@ -504,412 +689,132 @@
 </div>
 
 <style>
-/* スライド式スイッチ */
-.switch {
-	position: relative;
-	display: inline-block;
-	width: 50px;
-	height: 24px;
-	margin: 0 8px;
-}
-.switch input {
-	opacity: 0;
-	width: 0;
-	height: 0;
-}
-.slider {
-	position: absolute;
-	cursor: pointer;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	background-color: #ccc;
-	transition: .4s;
-	border-radius: 24px;
-}
-.slider:before {
-	position: absolute;
-	content: "";
-	height: 18px;
-	width: 18px;
-	left: 3px;
-	bottom: 3px;
-	background-color: white;
-	transition: .4s;
-	border-radius: 50%;
-}
-input:checked + .slider {
-	background-color: #2196F3;
-}
-input:checked + .slider:before {
-	transform: translateX(26px);
-}
-	:global(.bracket-match-team) {
-		background-color: #f0f0f0 !important;
-		border: 1px solid #ccc !important;
+	/* General */
+	.dashboard-container { padding: 2rem; font-family: sans-serif; }
+	main { text-align: center; }
+	h1 { font-size: 2.5rem; margin-right: auto; }
+	h2 { margin-top: 2rem; }
+	h3 { margin-bottom: 1rem; }
+	button { padding: 0.5rem 1rem; color: white; background-color: #5a5a5a; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
+	button.active { background-color: #4285f4; }
+	button:hover { opacity: 0.9; }
+	.update-btn { 
+		background: #4285f4; 
+		margin-top: 1.5rem; 
+		transition: all 0.2s ease;
 	}
-	:global(.bracket-match-winner .bracket-match-team) {
-		background-color: #d4edda !important;
-		font-weight: bold;
+	.update-btn:hover:not(:disabled) { 
+		background: #3367d6; 
+		transform: translateY(-1px);
 	}
-	:global(.bracket-connector) {
-		border-color: #999 !important;
+	.update-btn:disabled { 
+		background: #ccc; 
+		cursor: not-allowed; 
+		opacity: 0.6;
 	}
+	.update-status { 
+		font-size: 0.95rem; 
+		margin-left: 1rem; 
+		font-weight: 500;
+	}
+	.update-status.success { color: #43a047; }
+	.update-status.error { color: #e53935; }
+	.update-status.loading { color: #ff9800; }
 
-	.dashboard-container {
-		align-items: center;
-		padding: 2rem;
-		font-family: sans-serif;
-	}
+	/* Header */
+	header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #ccc; flex-wrap: wrap; }
+	.dashboard-tabs { margin: 0 auto; }
+	.logout-btn { background-color: #d93025; margin-left: 1rem; }
+	.logout-btn:hover { background-color: #c5221b; }
 
-	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 2rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid #ccc;
-		flex-wrap: wrap; /* Allow wrapping */
-	}
+	/* Content Sections */
+	.sports-buttons, .tournament-selector, .relay-type-selector, .input-tabs { margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+	.bracket-area { margin-top: 2rem; overflow-x: auto; }
+	.bracket-wrapper { display: flex; align-items: center; justify-content: center; min-width: 800px; }
+	.scores-area { width: 100%; }
+	.match-input-area { margin-top: 2rem; display: flex; flex-direction: column; align-items: center; width: 100%; }
+	.relay-area { margin-top: 2rem; }
+	.relay-info { background: #f8f9fa; border-radius: 8px; padding: 1rem; margin: 1rem 0; max-width: 600px; margin-left: auto; margin-right: auto; }
+	.relay-info p { margin: 0.5rem 0; font-size: 0.9rem; color: #666; }
 
-	main {
-		text-align: center;
-		align-items: center;
-		justify-content: center;
-	}
+	/* Weather Switcher */
+	.weather-switcher { display: flex; align-items: center; gap: 8px; margin-left: 2rem; }
+	.switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+	.switch input { opacity: 0; width: 0; height: 0; }
+	.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+	.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+	input:checked + .slider { background-color: #2196F3; }
+	input:checked + .slider:before { transform: translateX(26px); }
 
-	h1 {
-		font-size: 2.5rem;
-		margin-right: auto; /* Push other items to the right */
-	}
+	/* Bracketry Global Styles */
+	:global(.bracket-match-team) { background-color: #f0f0f0 !important; border: 1px solid #ccc !important; }
+	:global(.bracket-match-winner .bracket-match-team) { background-color: #d4edda !important; font-weight: bold; }
+	:global(.bracket-connector) { border-color: #999 !important; }
 
-	.dashboard-tabs {
-		margin: 0 auto; /* Center the tabs */
-	}
+	/* Scores Table */
+	.scores-container { display: flex; width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+	.score-category-column { position: sticky; left: 0; z-index: 1; background-color: #fff; flex-shrink: 0; border-right: 1px solid #ddd; }
+	.scores-data-wrapper { display: flex; overflow-x: auto; }
+	.score-column { flex: 0 0 120px; display: flex; flex-direction: column; border-left: 1px solid #ddd; }
+	.score-header { padding: 10px; text-align: center; font-weight: bold; background-color: #f2f2f2; border-bottom: 1px solid #ddd; }
+	.score-cell { padding: 10px; text-align: center; border-bottom: 1px solid #ddd; min-width: 150px; }
+	.score-column .score-cell { min-width: auto; }
+	.score-cell.odd-row { background-color: #f9f9f9; }
 
-	button {
-		padding: 0.5rem 1rem;
-		color: white;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		transition: background-color 0.3s;
-	}
-
-	header button.logout-btn {
-		background-color: #d93025;
-		margin-left: 1rem; /* Add some space */
-	}
-	header button.logout-btn:hover {
-		background-color: #c5221b;
-	}
-
-	.sports-buttons, .tournament-selector {
-		margin-bottom: 2rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
-		flex-wrap: wrap; /* Allow buttons to wrap */
-	}
-
-	.scores-area {
-		width: 100%;
-	}
-
-	.scores-container {
-		display: flex;
-		width: 100%;
-		border: 1px solid #ddd;
-		border-radius: 8px;
-		overflow: hidden;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-	}
-	.score-category-column {
-		position: sticky;
-		left: 0;
-		z-index: 1;
-		background-color: #fff; /* Base for sticky column */
-		flex-shrink: 0;
-		border-right: 1px solid #ddd;
-	}
-	.scores-data-wrapper {
-		display: flex;
-		overflow-x: auto;
-		scroll-snap-type: x mandatory;
-		-webkit-overflow-scrolling: touch;
-	}
-	.score-column {
-		flex: 0 0 120px; /* Width of each class column */
-		scroll-snap-align: start;
-		display: flex;
-		flex-direction: column;
-		border-left: 1px solid #ddd;
-	}
-	.score-column:first-child {
-		border-left: none;
-	}
-	.score-header {
-		padding: 10px;
-		text-align: center;
-		font-weight: bold;
-		background-color: #f2f2f2;
-		border-bottom: 1px solid #ddd;
-	}
-	.score-cell {
-		padding: 10px;
-		text-align: center;
-		border-bottom: 1px solid #ddd;
-		min-width: 150px; /* Set width on category cells */
-	}
-	.score-column .score-cell {
-		min-width: auto; /* Unset for data cells */
-	}
-	.score-cell:last-child {
-		border-bottom: none;
-	}
-	.score-cell.odd-row {
-		background-color: #f9f9f9;
-	}
-		.modal-overlay {
-			position: fixed;
-			top: 0;
-			left: 0;
-			width: 100vw;
-			height: 100vh;
-			background: rgba(0,0,0,0.3); /* 背景のみ半透明 */
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			z-index: 1000;
-			pointer-events: auto;
-		}
-		.modal-content {
-			background: #fff; /* モーダル本体は白色 */
-			border-radius: 8px;
-			box-shadow: 0 2px 8px rgba(66,133,244,0.18);
-			padding: 2rem;
-			width: 90%;
-			max-width: 500px; /* Set a max-width */
-			text-align: center;
-			margin: auto;
-			pointer-events: auto;
-			z-index: 1000;
-		}
-		.modal-overlay > * {
-			pointer-events: auto;
-		}
-		.modal-overlay:before {
-			content: '';
-			position: absolute;
-			top: 0;
-			left: 0;
-			width: 100vw;
-			height: 100vh;
-			background: rgba(0,0,0,0.3);
-			z-index: 999;
-			pointer-events: none;
-		}
-		.modal-actions {
-			display: flex;
-			gap: 1rem;
-			justify-content: center;
-			margin-top: 1.5rem;
-		}
+	/* Match/Relay Input Cards */
+	.tournament-edit-card, .relay-input-card { background: #f8f9fa; border-radius: 12px; box-shadow: 0 2px 8px rgba(66,133,244,0.08); padding: 2rem; margin-bottom: 2rem; width: 100%; max-width: 800px; }
+	.match-edit-form { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+	.match-info { font-size: 0.9rem; color: #333; display: flex; flex-wrap: wrap; gap: 1rem; flex-grow: 1; }
+	.match-info.finished { background: #f0f0f0; padding: 1rem; border-radius: 6px; width: 100%; }
+	.score-inputs { display: flex; align-items: center; gap: 0.5rem; }
+	.score-input { width: 4rem; padding: 0.5rem; font-size: 1.1rem; border: 1px solid #4285f4; border-radius: 4px; text-align: center; }
 	
-	.bracket-area {
-		margin-top: 2rem;
-		overflow-x: auto;
+	/* Relay D&D List */
+	.dnd-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		max-width: 400px;
+		margin: 1.5rem auto;
 	}
-
-	.bracket-wrapper {
+	.dnd-item {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		min-width: 800px;
-	}
-	/* 試合結果入力デザイン */
-	.match-input-area {
-		margin-top: 2rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		width: 100%;
-	}
-	.tournament-edit-card {
-		background: #f8f9fa;
-		border-radius: 12px;
-		box-shadow: 0 2px 8px rgba(66,133,244,0.08);
-		padding: 2rem;
-		margin-bottom: 2rem;
-		width: 100%;
-		max-width: 800px;
-	}
-	.matches-list {
-		margin-top: 1rem;
-	}
-	.match-edit-form {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem; /* Increased gap */
-		background: #fff;
-		border-radius: 8px;
-		box-shadow: 0 1px 4px rgba(66,133,244,0.06);
-		padding: 1.5rem; /* Increased padding */
-		margin-bottom: 1rem;
-	}
-	.match-info {
-		font-size: 1rem;
-		color: #333;
-		display: flex;
-		flex-wrap: wrap; /* Allow wrapping */
-		gap: 1rem; /* Adjusted gap */
-	}
-	.score-inputs {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap; /* Allow wrapping */
-	}
-	.score-input {
-		width: 4rem; /* Increased width */
-		padding: 0.5rem;
-		font-size: 1.1rem;
-		border: 1px solid #4285f4;
-		border-radius: 4px;
-		text-align: center;
-	}
-	.update-btn {
-		background: #4285f4;
-		color: #fff;
-		border: none;
-		border-radius: 4px;
-		padding: 0.7rem 1.5rem; /* Increased padding */
-		font-size: 1rem;
-		cursor: pointer;
-		margin-top: 0.5rem;
-		transition: background 0.2s;
-		align-self: flex-start; /* Align button to the left */
-	}
-	.update-btn:hover {
-		background: #3367d6;
-	}
-	.update-status {
-		font-size: 0.95rem;
-		margin-top: 0.2rem;
-	}
-	.update-status.success {
-		color: #43a047;
-	}
-	.update-status.error {
-		color: #e53935;
-	}
-
-/* --- Responsive Styles --- */
-
-@media (max-width: 900px) {
-	.dashboard-container {
-		padding: 1.5rem;
-	}
-	h1 {
-		font-size: 2.2rem;
-	}
-	.bracket-wrapper {
-		min-width: 600px;
-	}
-	.tournament-edit-card {
-		padding: 1.5rem;
-	}
-}
-
-@media (max-width: 768px) {
-	header {
-		flex-direction: column;
-		align-items: stretch; /* Full width items */
-		gap: 1rem;
-	}
-	h1 {
-		font-size: 2rem;
-		text-align: center;
-		margin-right: 0;
-	}
-	.dashboard-tabs {
-		order: 2; /* Change order */
-		width: 100%;
-		display: flex;
-		justify-content: center;
-	}
-	header button.logout-btn {
-		order: 3; /* Change order */
-		margin-left: 0;
-		width: 100%;
-	}
-	.match-edit-form {
 		padding: 1rem;
+		background-color: white;
+		border: 1px solid #ddd;
+		border-radius: 6px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+		cursor: grab;
+		user-select: none;
+		transition: all 0.2s ease;
+		position: relative;
 	}
-	.match-info {
-		flex-direction: column;
-		gap: 0.5rem;
-		align-items: flex-start;
+	.dnd-item:hover { 
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+		transform: translateY(-1px);
 	}
-	.score-inputs {
-		justify-content: center;
-		width: 100%;
+	.dnd-item:active { 
+		cursor: grabbing; 
+		background-color: #f0f8ff; 
+		transform: scale(1.02);
 	}
-	.update-btn {
-		width: 100%;
-		text-align: center;
-	}
-}
+	.rank-badge { font-weight: bold; font-size: 1rem; color: #fff; background-color: #6c757d; border-radius: 4px; padding: 0.3rem 0.6rem; margin-right: 1rem; }
+	.class-name { font-size: 1.1rem; }
 
-@media (max-width: 600px) {
-	.dashboard-container {
-		padding: 1rem;
+	/* Modal */
+	.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+	.modal-content { background: #fff; border-radius: 8px; padding: 2rem; width: 90%; max-width: 500px; text-align: center; }
+	.modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+	.modal-actions button { background: #ccc; }
+	.modal-actions .ok-btn { background: #4285f4; }
+
+	/* Responsive */
+	@media (max-width: 768px) {
+		header { flex-direction: column; align-items: stretch; gap: 1rem; }
+		h1 { text-align: center; margin-right: 0; }
+		.dashboard-tabs { order: 2; width: 100%; display: flex; justify-content: center; }
+		.logout-btn { order: 3; margin-left: 0; width: 100%; }
+		.match-edit-form { flex-direction: column; align-items: stretch; }
 	}
-	.dashboard-tabs {
-		flex-direction: column; /* Stack tabs vertically */
-		gap: 0.5rem;
-		margin-top: 1rem;
-		margin-bottom: 1rem;
-	}
-	.dashboard-tabs button {
-		width: 100%;
-		padding: 0.8rem 1rem;
-		font-size: 1rem;
-	}
-	/* This rule was redundant and had !important, removing for better practice */
-	/* .dashboard-tabs button {
-		background-color: #3367d6 !important;
-	} */
-	.dashboard-tabs button.active {
-		background-color: #3367d6; /* Use specificity instead of !important */
-	}
-	h1 {
-		font-size: 1.8rem;
-	}
-	.sports-buttons, .tournament-selector {
-		flex-direction: column;
-		gap: 0.5rem;
-		width: 100%;
-	}
-	.sports-buttons button, .tournament-selector button {
-		width: 100%;
-		font-size: 1rem;
-		padding: 0.8rem 0.5rem;
-	}
-	.bracket-area {
-		margin-top: 1rem;
-	}
-	.bracket-wrapper {
-		min-width: 350px;
-	}
-	.tournament-edit-card {
-		padding: 1rem;
-	}
-	.modal-content {
-		padding: 1.5rem;
-		width: 95%;
-	}
-}
 </style>
