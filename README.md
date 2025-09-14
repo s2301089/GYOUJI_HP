@@ -97,6 +97,8 @@ go mod tidy
 cp .env.sample .env
 
 cp backend/.env.sample backend/.env
+
+cp frontend/.env.sample frontend/.env
 ```
 
 ### 3.3. 環境変数の設定
@@ -146,6 +148,16 @@ ADMIN_RELAY_PASS=<your_relay_password>
 # 学生用共通パスワード
 STUDENT_USER=student
 STUDENT_PASS=your_student_password
+```
+
+`frontend/.env` ファイルを編集して、以下の環境変数を設定してください：
+
+```env
+# 開発環境設定
+VITE_API_BASE_URL=http://localhost:8080/api
+VITE_APP_TITLE=Tournament Management System
+VITE_ENABLE_POLLING=true
+VITE_POLLING_INTERVAL=30000
 ```
 
 `JWT_SECRET`は次のコマンドで生成するとよい
