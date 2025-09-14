@@ -3,6 +3,7 @@
 	import { tick } from 'svelte';
 	import { createBracket } from 'bracketry';
 	import RelayTable from '../../lib/RelayTable.svelte';
+	import AttendanceInput from '../../lib/AttendanceInput.svelte';
 	import { dndzone } from 'svelte-dnd-action';
 
 	// --- State Variables ---
@@ -44,6 +45,11 @@
 	let scores = [];
 	let scoresLoading = false;
 
+	// Attendance
+	let attendanceScores = [];
+	let attendanceLoading = false;
+	let attendanceUpdateStatus = '';
+
 	// Relay
 	let relayActive = false; // For tournament tab's relay view
 	let relayType = 'A';
@@ -60,6 +66,9 @@
 		await fetchUser();
 		await fetchTournament('volleyball');
 		await fetchClassNameMap();
+		if (userRole === 'superroot') {
+			await fetchAttendanceScores();
+		}
 	});
 
 	async function fetchUser() {
@@ -392,6 +401,69 @@
 		setTimeout(() => { relayUpdateStatus = ''; }, 3000);
 	}
 
+	// 出席点関連の関数
+	async function fetchAttendanceScores() {
+		attendanceLoading = true;
+		const token = localStorage.getItem('token');
+		try {
+			const res = await fetch('/api/attendance', {
+				headers: token ? { Authorization: `Bearer ${token}` } : {}
+			});
+			if (res.ok) {
+				attendanceScores = await res.json();
+			} else {
+				console.error('Failed to fetch attendance scores');
+			}
+		} catch (e) {
+			console.error('Error fetching attendance scores:', e);
+		} finally {
+			attendanceLoading = false;
+		}
+	}
+
+	function handleAttendanceScoreChange(event) {
+		const { classId, score } = event.detail;
+		attendanceScores = attendanceScores.map(item => 
+			item.class_id === classId ? { ...item, score } : item
+		);
+	}
+
+	async function handleAttendanceBatchUpdate() {
+		attendanceUpdateStatus = 'loading';
+		const token = localStorage.getItem('token');
+		
+		const scores = attendanceScores.map(item => ({
+			class_id: item.class_id,
+			score: item.score
+		}));
+
+		try {
+			const res = await fetch('/api/attendance/batch', {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
+				body: JSON.stringify({ scores })
+			});
+
+			if (res.ok) {
+				attendanceUpdateStatus = 'success';
+				await fetchScores(); // スコア表を更新
+			} else {
+				attendanceUpdateStatus = 'error';
+				const errorData = await res.json();
+				alert(`更新に失敗しました: ${errorData.error}`);
+			}
+		} catch (e) {
+			console.error('Error updating attendance scores:', e);
+			attendanceUpdateStatus = 'error';
+			alert('サーバーとの通信に失敗しました。');
+		}
+
+		setTimeout(() => { attendanceUpdateStatus = ''; }, 3000);
+	}
+
 	const scoreCategories = [
         { name: '春スポ体合計点', key: 'init_score' },
         { name: '出席点', key: 'attendance_score' },
@@ -528,8 +600,11 @@
 					{#if userRole === 'superroot' || userRole === 'admin'}
 						<button class:active={activeInputTab === 'tournament'} on:click={() => activeInputTab = 'tournament'}>トーナメント</button>
 					{/if}
-					{#if userRole === 'superroot' || userRole === 'admin_relay'}
+					{#if userRole === 'superroot' || assignedSport === 'relay'}
 						<button class:active={activeInputTab === 'relay'} on:click={() => { activeInputTab = 'relay'; fetchRelayResults(relayType); }}>リレー</button>
+					{/if}
+					{#if userRole === 'superroot'}
+						<button class:active={activeInputTab === 'attendance'} on:click={() => activeInputTab = 'attendance'}>出席点</button>
 					{/if}
 				</div>
 
@@ -666,6 +741,15 @@
 							<p>リレーデータがありません。</p>
 						{/if}
 					</div>
+
+				{:else if activeInputTab === 'attendance'}
+					<AttendanceInput 
+						{attendanceScores}
+						loading={attendanceLoading}
+						updateStatus={attendanceUpdateStatus}
+						on:scoreChange={handleAttendanceScoreChange}
+						on:batchUpdate={handleAttendanceBatchUpdate}
+					/>
 				{/if}
 			</div>
 		{/if}
