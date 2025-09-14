@@ -93,7 +93,9 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	}
 
 	// --- ポイント付与ロジック ---
-	if winnerTeamID.Valid && winnerClassID.Valid {
+	isLoserBracket := tournamentName == "卓球（雨天時・敗者戦左側）" || tournamentName == "卓球（雨天時・敗者戦右側）"
+
+	if winnerTeamID.Valid && winnerClassID.Valid && !isLoserBracket {
 		// ラウンドごとに該当カラムに10点を登録
 		var scoreColumn string
 		switch currentRound {
