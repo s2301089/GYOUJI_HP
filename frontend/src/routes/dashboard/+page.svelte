@@ -195,6 +195,26 @@
 		}
 	}
 
+	const scoreCategories = [
+        { name: '春スポ体合計点', key: 'init_score' },
+        { name: '出席点', key: 'attendance_score' },
+        { name: 'バレーボール1勝点', key: 'volleyball1_score' },
+        { name: 'バレーボール2勝点', key: 'volleyball2_score' },
+        { name: 'バレーボール3勝点', key: 'volleyball3_score' },
+        { name: 'バレーボール優勝点', key: 'volleyball_championship_score' },
+        { name: '卓球1勝点', key: 'table_tennis1_score' },
+        { name: '卓球2勝点', key: 'table_tennis2_score' },
+        { name: '卓球3勝点', key: 'table_tennis3_score' },
+        { name: '卓球優勝点', key: 'table_tennis_championship_score' },
+        { name: '卓球雨天ボーナス', key: 'table_tennis_rainy_bonus_score' },
+        { name: 'サッカー1勝点', key: 'soccer1_score' },
+        { name: 'サッカー2勝点', key: 'soccer2_score' },
+        { name: 'サッカー3勝点', key: 'soccer3_score' },
+        { name: 'サッカー優勝点', key: 'soccer_championship_score' },
+        { name: '合計(春スポ体合計点除く)', key: 'total_excluding_init' },
+        { name: '合計(春スポ体合計点含む)', key: 'total_including_init' },
+    ];
+
 	// モーダル制御用
 	let showConfirmModal = false;
 	let editingMatch = null;
@@ -348,54 +368,24 @@
 					<p>読み込み中...</p>
 				{:else}
 					{#if scores.length > 0}
-						 <table class="scores-table">
-						 <thead>
-						 <tr>
-						 <th>クラス</th>
-						 <th>春スポ体合計点</th>
-						 <th>出席点</th>
-						 <th>バレーボール1勝点</th>
-						 <th>バレーボール2勝点</th>
-						 <th>バレーボール3勝点</th>
-						 <th>バレーボール優勝点</th>
-						 <th>卓球1勝点</th>
-						 <th>卓球2勝点</th>
-						 <th>卓球3勝点</th>
-						 <th>卓球優勝点</th>
-						 <th>卓球雨天ボーナス</th>
-						 <th>サッカー1勝点</th>
-						 <th>サッカー2勝点</th>
-						 <th>サッカー3勝点</th>
-						 <th>サッカー優勝点</th>
-						 <th>合計(春スポ体合計点除く)</th>
-						 <th>合計(春スポ体合計点含む)</th>
-						 </tr>
-						 </thead>
-						 <tbody>
-						 {#each scores as s}
-						 <tr>
-						 <td>{s.class_name}</td>
-						 <td>{s.init_score}</td>
-						 <td>{s.attendance_score}</td>
-						 <td>{s.volleyball1_score}</td>
-						 <td>{s.volleyball2_score}</td>
-						 <td>{s.volleyball3_score}</td>
-						 <td>{s.volleyball_championship_score}</td>
-						 <td>{s.table_tennis1_score}</td>
-						 <td>{s.table_tennis2_score}</td>
-						 <td>{s.table_tennis3_score}</td>
-						 <td>{s.table_tennis_championship_score}</td>
-						 <td>{s.table_tennis_rainy_bonus_score}</td>
-						 <td>{s.soccer1_score}</td>
-						 <td>{s.soccer2_score}</td>
-						 <td>{s.soccer3_score}</td>
-						 <td>{s.soccer_championship_score}</td>
-						 <td><b>{s.total_excluding_init}</b></td>
-						 <td><b>{s.total_including_init}</b></td>
-						 </tr>
-						 {/each}
-						 </tbody>
-						 </table>
+						<div class="scores-container">
+							<div class="score-category-column">
+								<div class="score-header">得点項目</div>
+								{#each scoreCategories as category, i}
+									<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
+								{/each}
+							</div>
+							<div class="scores-data-wrapper">
+								{#each scores as s}
+									<div class="score-column">
+										<div class="score-header">{s.class_name}</div>
+										{#each scoreCategories as category, i}
+											<div class="score-cell" class:odd-row={i % 2 === 0}>{s[category.key]}</div>
+										{/each}
+									</div>
+								{/each}
+							</div>
+						</div>
 					{:else}
 						<p>スコアデータがありません。</p>
 					{/if}
@@ -580,6 +570,7 @@ input:checked + .slider:before {
 		margin-bottom: 2rem;
 		padding-bottom: 1rem;
 		border-bottom: 1px solid #ccc;
+		flex-wrap: wrap; /* Allow wrapping */
 	}
 
 	main {
@@ -590,6 +581,11 @@ input:checked + .slider:before {
 
 	h1 {
 		font-size: 2.5rem;
+		margin-right: auto; /* Push other items to the right */
+	}
+
+	.dashboard-tabs {
+		margin: 0 auto; /* Center the tabs */
 	}
 
 	button {
@@ -603,6 +599,7 @@ input:checked + .slider:before {
 
 	header button.logout-btn {
 		background-color: #d93025;
+		margin-left: 1rem; /* Add some space */
 	}
 	header button.logout-btn:hover {
 		background-color: #c5221b;
@@ -614,6 +611,66 @@ input:checked + .slider:before {
 		align-items: center;
 		justify-content: center;
 		gap: 1rem;
+		flex-wrap: wrap; /* Allow buttons to wrap */
+	}
+
+	.scores-area {
+		width: 100%;
+	}
+
+	.scores-container {
+		display: flex;
+		width: 100%;
+		border: 1px solid #ddd;
+		border-radius: 8px;
+		overflow: hidden;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+	}
+	.score-category-column {
+		position: sticky;
+		left: 0;
+		z-index: 1;
+		background-color: #fff; /* Base for sticky column */
+		flex-shrink: 0;
+		border-right: 1px solid #ddd;
+	}
+	.scores-data-wrapper {
+		display: flex;
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
+		-webkit-overflow-scrolling: touch;
+	}
+	.score-column {
+		flex: 0 0 120px; /* Width of each class column */
+		scroll-snap-align: start;
+		display: flex;
+		flex-direction: column;
+		border-left: 1px solid #ddd;
+	}
+	.score-column:first-child {
+		border-left: none;
+	}
+	.score-header {
+		padding: 10px;
+		text-align: center;
+		font-weight: bold;
+		background-color: #f2f2f2;
+		border-bottom: 1px solid #ddd;
+	}
+	.score-cell {
+		padding: 10px;
+		text-align: center;
+		border-bottom: 1px solid #ddd;
+		min-width: 150px; /* Set width on category cells */
+	}
+	.score-column .score-cell {
+		min-width: auto; /* Unset for data cells */
+	}
+	.score-cell:last-child {
+		border-bottom: none;
+	}
+	.score-cell.odd-row {
+		background-color: #f9f9f9;
 	}
 		.modal-overlay {
 			position: fixed;
@@ -633,7 +690,8 @@ input:checked + .slider:before {
 			border-radius: 8px;
 			box-shadow: 0 2px 8px rgba(66,133,244,0.18);
 			padding: 2rem;
-			min-width: 300px;
+			width: 90%;
+			max-width: 500px; /* Set a max-width */
 			text-align: center;
 			margin: auto;
 			pointer-events: auto;
@@ -677,6 +735,7 @@ input:checked + .slider:before {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		width: 100%;
 	}
 	.tournament-edit-card {
 		background: #f8f9fa;
@@ -685,7 +744,7 @@ input:checked + .slider:before {
 		padding: 2rem;
 		margin-bottom: 2rem;
 		width: 100%;
-		max-width: 600px;
+		max-width: 800px;
 	}
 	.matches-list {
 		margin-top: 1rem;
@@ -693,27 +752,29 @@ input:checked + .slider:before {
 	.match-edit-form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 1rem; /* Increased gap */
 		background: #fff;
 		border-radius: 8px;
 		box-shadow: 0 1px 4px rgba(66,133,244,0.06);
-		padding: 1rem;
+		padding: 1.5rem; /* Increased padding */
 		margin-bottom: 1rem;
 	}
 	.match-info {
 		font-size: 1rem;
 		color: #333;
 		display: flex;
-		gap: 1.5rem;
+		flex-wrap: wrap; /* Allow wrapping */
+		gap: 1rem; /* Adjusted gap */
 	}
 	.score-inputs {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		flex-wrap: wrap; /* Allow wrapping */
 	}
 	.score-input {
-		width: 3rem;
-		padding: 0.3rem;
+		width: 4rem; /* Increased width */
+		padding: 0.5rem;
 		font-size: 1.1rem;
 		border: 1px solid #4285f4;
 		border-radius: 4px;
@@ -724,11 +785,12 @@ input:checked + .slider:before {
 		color: #fff;
 		border: none;
 		border-radius: 4px;
-		padding: 0.5rem 1.2rem;
+		padding: 0.7rem 1.5rem; /* Increased padding */
 		font-size: 1rem;
 		cursor: pointer;
 		margin-top: 0.5rem;
 		transition: background 0.2s;
+		align-self: flex-start; /* Align button to the left */
 	}
 	.update-btn:hover {
 		background: #3367d6;
@@ -744,43 +806,87 @@ input:checked + .slider:before {
 		color: #e53935;
 	}
 
+/* --- Responsive Styles --- */
+
 @media (max-width: 900px) {
 	.dashboard-container {
-		padding: 1rem;
+		padding: 1.5rem;
 	}
 	h1 {
-		font-size: 2rem;
+		font-size: 2.2rem;
 	}
 	.bracket-wrapper {
 		min-width: 600px;
 	}
+	.tournament-edit-card {
+		padding: 1.5rem;
+	}
+}
+
+@media (max-width: 768px) {
+	header {
+		flex-direction: column;
+		align-items: stretch; /* Full width items */
+		gap: 1rem;
+	}
+	h1 {
+		font-size: 2rem;
+		text-align: center;
+		margin-right: 0;
+	}
+	.dashboard-tabs {
+		order: 2; /* Change order */
+		width: 100%;
+		display: flex;
+		justify-content: center;
+	}
+	header button.logout-btn {
+		order: 3; /* Change order */
+		margin-left: 0;
+		width: 100%;
+	}
+	.match-edit-form {
+		padding: 1rem;
+	}
+	.match-info {
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+	.score-inputs {
+		justify-content: center;
+		width: 100%;
+	}
+	.update-btn {
+		width: 100%;
+		text-align: center;
+	}
 }
 
 @media (max-width: 600px) {
+	.dashboard-container {
+		padding: 1rem;
+	}
 	.dashboard-tabs {
-		display: flex;
-		gap: 1rem;
+		flex-direction: column; /* Stack tabs vertically */
+		gap: 0.5rem;
 		margin-top: 1rem;
 		margin-bottom: 1rem;
 	}
 	.dashboard-tabs button {
-		padding: 0.5rem 1.5rem;
-		background: #4285f4;
-		color: #fff;
-		border: none;
-		border-radius: 4px;
-		font-size: 1.1rem;
-		cursor: pointer;
-		transition: background 0.2s;
+		width: 100%;
+		padding: 0.8rem 1rem;
+		font-size: 1rem;
 	}
-	.dashboard-tabs button {
+	/* This rule was redundant and had !important, removing for better practice */
+	/* .dashboard-tabs button {
 		background-color: #3367d6 !important;
-	}
-	.dashboard-tabs button:hover {
-		background-color: #3367d6 !important;
+	} */
+	.dashboard-tabs button.active {
+		background-color: #3367d6; /* Use specificity instead of !important */
 	}
 	h1 {
-		font-size: 1.3rem;
+		font-size: 1.8rem;
 	}
 	.sports-buttons, .tournament-selector {
 		flex-direction: column;
@@ -790,14 +896,20 @@ input:checked + .slider:before {
 	.sports-buttons button, .tournament-selector button {
 		width: 100%;
 		font-size: 1rem;
-		padding: 0.7rem 0.5rem;
+		padding: 0.8rem 0.5rem;
 	}
 	.bracket-area {
 		margin-top: 1rem;
-		overflow-x: auto;
 	}
 	.bracket-wrapper {
 		min-width: 350px;
+	}
+	.tournament-edit-card {
+		padding: 1rem;
+	}
+	.modal-content {
+		padding: 1.5rem;
+		width: 95%;
 	}
 }
 </style>
