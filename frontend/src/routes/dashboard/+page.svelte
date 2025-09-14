@@ -272,7 +272,6 @@
 <div class="dashboard-container">
 	<header>
 		<h1>ダッシュボード</h1>
-		<button on:click={logout}>ログアウト</button>
 		<nav class="dashboard-tabs">
 			<button class:active={activeTab === 'tournament'} on:click={() => { activeTab = 'tournament'; fetchTournament('volleyball'); }}>競技トーナメント</button>
 			<button class:active={activeTab === 'scores'} on:click={async () => { activeTab = 'scores'; await fetchScores(); }}>現在の得点</button>
@@ -286,6 +285,7 @@
 				}}>試合結果入力</button>
 			{/if}
 		</nav>
+		<button class="logout-btn" on:click={logout}>ログアウト</button>
 	</header>
 	<main>
 		{#if activeTab === 'tournament'}
@@ -595,10 +595,10 @@ input:checked + .slider:before {
 		transition: background-color 0.3s;
 	}
 
-	header button {
+	header button.logout-btn {
 		background-color: #d93025;
 	}
-	header button:hover {
+	header button.logout-btn:hover {
 		background-color: #c5221b;
 	}
 
@@ -767,8 +767,11 @@ input:checked + .slider:before {
 		cursor: pointer;
 		transition: background 0.2s;
 	}
-	.dashboard-tabs button.active {
-		background: #3367d6;
+	.dashboard-tabs button {
+		background-color: #3367d6 !important;
+	}
+	.dashboard-tabs button:hover {
+		background-color: #3367d6 !important;
 	}
 	h1 {
 		font-size: 1.3rem;
