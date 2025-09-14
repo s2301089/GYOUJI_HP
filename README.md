@@ -86,6 +86,8 @@
 git clone <repository-url>
 cd GYOUJI_HP
 
+chmod 600 ./letsencrypt/acme.json
+
 cd frontend
 npm install
 
