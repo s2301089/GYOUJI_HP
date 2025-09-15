@@ -335,6 +335,7 @@
 	function confirmUpdateMatchScore() {
 		if (editingMatch && editingSport) {
 			updateMatchScore(editingMatch, editingSport);
+			location.reload();
 		}
 		showConfirmModal = false;
 		editingMatch = null;
