@@ -48,7 +48,13 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	// JWTをHttpOnly Cookieに設定
+	// localhostでの開発環境と本番環境の両方で動作するように設定
+	// 本番環境では secure を true に、samesite を none にする必要がある
+	secure := c.Request.Header.Get("X-Forwarded-Proto") == "https"
+	c.SetCookie("jwt", token, 3600*24, "/", c.Request.Host, secure, true)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
 }
 
 // Logout godoc
@@ -60,6 +66,9 @@ func (h *UserHandler) Login(c *gin.Context) {
 // @Success 200 {object} map[string]string
 // @Router /api/auth/logout [post]
 func (h *UserHandler) Logout(c *gin.Context) {
+	// Cookieをクリア
+	secure := c.Request.Header.Get("X-Forwarded-Proto") == "https"
+	c.SetCookie("jwt", "", -1, "/", c.Request.Host, secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
 

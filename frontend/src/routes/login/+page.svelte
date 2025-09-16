@@ -12,12 +12,11 @@
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // Cookieを送信するために必要
         body: JSON.stringify({ username, password }),
       });
 
       if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem("token", data.token);
         goto("/dashboard");
       } else {
         errorMessage = "ログインに失敗しました。";

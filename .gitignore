@@ -35,3 +35,4 @@ Thumbs.db
 # ---- その他 ----
 coverage/
 *.log
+.svelte-kit/

@@ -15,9 +15,11 @@ import (
 func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.TournamentHandler, matchHandler *handler.MatchHandler, jwtSecret string, scoreHandler *handler.ScoreHandler, relayHandler *handler.RelayHandler, attendanceHandler *handler.AttendanceHandler) *gin.Engine {
 	r := gin.Default()
 
-	// CORSミドルウェアの設定（開発用に寛容な設定）
+	// CORSミドルウェアの設定
+	// httpOnly cookie を使うため、Allow-Originを特定し、Allow-Credentialsをtrueにする
 	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		// TODO: 本番環境のフロントエンドのオリジンに合わせて変更する
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-control-allow-methods", "POST, OPTIONS, GET, PUT, DELETE")
@@ -43,13 +45,13 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 		// --- 認証関連のルートグループ ---
 		auth := api.Group("/auth")
 		{
-			// ログインは認証不要
+			// ログイン・ログアウトは認証不要
 			auth.POST("/login", userHandler.Login)
+			auth.POST("/logout", userHandler.Logout)
 
-			// ログアウト・ユーザー情報取得は認証必須
+			// ユーザー情報取得は認証必須
 			auth.Use(middleware.AuthMiddleware(jwtSecret))
 			{
-				auth.POST("/logout", userHandler.Logout)
 				auth.GET("/me", userHandler.GetMe)
 			}
 		}

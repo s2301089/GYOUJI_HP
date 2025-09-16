@@ -72,25 +72,33 @@
 	});
 
 	async function fetchUser() {
-		const token = localStorage.getItem('token');
-		if (token) {
-			try {
-				const res = await fetch('/api/auth/me', {
-					headers: { Authorization: `Bearer ${token}` }
-				});
-				if (res.ok) {
-					const user = await res.json();
-					userRole = user.role || '';
-					assignedSport = user.assigned_sport || '';
-				}
-			} catch (e) {
-				console.error('Failed to fetch user', e);
+		try {
+			const res = await fetch('/api/auth/me', {
+				credentials: 'include'
+			});
+			if (res.ok) {
+				const user = await res.json();
+				userRole = user.role || '';
+				assignedSport = user.assigned_sport || '';
+			} else {
+				// トークンがない、または無効な場合はログインページにリダイレクト
+				goto('/login');
 			}
+		} catch (e) {
+			console.error('Failed to fetch user', e);
+			goto('/login');
 		}
 	}
 
-	function logout() {
-		localStorage.removeItem('token');
+	async function logout() {
+		try {
+			await fetch('/api/auth/logout', {
+				method: 'POST',
+				credentials: 'include'
+			});
+		} catch (e) {
+			console.error('Logout failed', e);
+		}
 		goto('/login');
 	}
 
@@ -102,12 +110,11 @@
 		isLoading = true;
 		allTournaments = [];
 		selectedTournament = null;
-		const token = localStorage.getItem('token');
 		try {
 			let url = `/api/tournaments/${sport}`;
 			// NOTE: The weather parameter is now handled by the frontend filtering
 			const res = await fetch(url, {
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
+				credentials: 'include'
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -137,14 +144,13 @@
 
 	async function fetchMatches(sport) {
 		matchesLoading = true;
-		const token = localStorage.getItem('token');
 		try {
 			let url = `/api/matches/${sport}`;
 			if (sport === 'table_tennis') {
 				url += `?weather=${tableTennisWeather}`;
 			}
 			const res = await fetch(url, {
-				headers: { Authorization: `Bearer ${token}` }
+				credentials: 'include'
 			});
 			if (res.ok) {
 				matchesBySport[sport] = await res.json();
@@ -160,11 +166,10 @@
 
 	async function fetchScores() {
 		scoresLoading = true;
-		const token = localStorage.getItem('token');
 		const classOrder = ['1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2', 'IS3', 'IT3', 'IE3', 'IS4', 'IT4', 'IE4', 'IS5', 'IT5', 'IE5', '専・教'];
 		try {
 			const res = await fetch('/api/score', {
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
+				credentials: 'include'
 			});
 			if (res.ok) {
 				let fetchedScores = await res.json();
@@ -188,10 +193,9 @@
 		relayLoading = true;
 		relayError = '';
 		relayType = type;
-		const token = localStorage.getItem('token');
 		try {
 			const res = await fetch(`/api/relay?block=${type}`, {
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
+				credentials: 'include'
 			});
 			if (res.ok) {
 				let data = await res.json();
@@ -242,7 +246,7 @@
 
 	async function fetchClassNameMap() {
 		try {
-			const res = await fetch('/api/score');
+			const res = await fetch('/api/score', { credentials: 'include' });
 			if (res.ok) {
 				const scoresData = await res.json();
 				classNameMap = scoresData.reduce((acc, s) => {
@@ -314,7 +318,6 @@
 	// --- API Updates ---
 
 	async function updateMatchScore(match, sport) {
-		const token = localStorage.getItem('token');
 		const body = {
 			user: userRole,
 			team1_score: match.team1_score,
@@ -325,7 +328,8 @@
 		try {
 			const res = await fetch(`/api/matches/${match.id}`, {
 				method: 'PUT',
-				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
 				body: JSON.stringify(body)
 			});
 			match._updateStatus = res.ok ? 'success' : 'error';
@@ -371,7 +375,6 @@
 
 	async function updateRelayRanks() {
 		relayUpdateStatus = 'loading';
-		const token = localStorage.getItem('token');
 
 		if (relayResults.length !== 6) {
 			alert('リレーのクラス数が6ではありません。');
@@ -390,7 +393,8 @@
 		try {
 			const res = await fetch(`/api/relay?block=${relayType}`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
 				body: JSON.stringify(body)
 			});
 			if (res.ok) {
@@ -412,10 +416,9 @@
 	// 出席点関連の関数
 	async function fetchAttendanceScores() {
 		attendanceLoading = true;
-		const token = localStorage.getItem('token');
 		try {
 			const res = await fetch('/api/attendance', {
-				headers: token ? { Authorization: `Bearer ${token}` } : {}
+				credentials: 'include'
 			});
 			if (res.ok) {
 				attendanceScores = await res.json();
@@ -438,7 +441,6 @@
 
 	async function handleAttendanceBatchUpdate() {
 		attendanceUpdateStatus = 'loading';
-		const token = localStorage.getItem('token');
 		
 		const scores = attendanceScores.map(item => ({
 			class_id: item.class_id,
@@ -449,9 +451,9 @@
 			const res = await fetch('/api/attendance/batch', {
 				method: 'PUT',
 				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`
+					'Content-Type': 'application/json'
 				},
+				credentials: 'include',
 				body: JSON.stringify({ scores })
 			});
 
