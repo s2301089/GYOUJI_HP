@@ -105,17 +105,22 @@
 		const token = localStorage.getItem('token');
 		try {
 			let url = `/api/tournaments/${sport}`;
-			if (sport === 'table_tennis') {
-				url += `?weather=${tableTennisWeather}`;
-			}
+			// NOTE: The weather parameter is now handled by the frontend filtering
 			const res = await fetch(url, {
 				headers: token ? { Authorization: `Bearer ${token}` } : {}
 			});
 			if (res.ok) {
 				const data = await res.json();
+				console.log('Fetched tournaments data:', data); // DEBUG
 				if (data && data.length > 0) {
 					allTournaments = data;
-					selectTournament(allTournaments[0]);
+					// After fetching, immediately filter and select the correct tournament
+					if (sport === 'table_tennis') {
+						const filtered = getFilteredTableTennisTournaments();
+						selectTournament(filtered[0]);
+					} else {
+						selectTournament(allTournaments[0]);
+					}
 				} else {
 					allTournaments = [];
 				}
@@ -271,7 +276,9 @@
     }
 
 	function toggleTableTennisWeather() {
+		console.log('Toggling weather...'); // DEBUG
 		tableTennisWeather = tableTennisWeather === 'sunny' ? 'rainy' : 'sunny';
+		console.log('New weather:', tableTennisWeather); // DEBUG
 		fetchTournament('table_tennis');
 		fetchMatches('table_tennis');
 	}
@@ -285,10 +292,9 @@
 	}
 
 	function getFilteredTableTennisTournaments() {
-		if (tableTennisWeather === 'sunny') {
-			return allTournaments.filter(t => t.name === '卓球（晴天時）');
-		}
-		return allTournaments.filter(t => t.name.startsWith('卓球（雨天時）'));
+		const filtered = tableTennisWeather === 'sunny'
+			? allTournaments.filter(t => t.name === '卓球（晴天時）')
+			: allTournaments.filter(t => t.name.includes('雨天時')); // Use includes for more flexible matching
 	}
 
 	function selectTournament(tournamentData) {
