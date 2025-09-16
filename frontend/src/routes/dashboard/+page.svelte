@@ -292,7 +292,8 @@
 	}
 
 	function getFilteredTableTennisTournaments() {
-		const filtered = tableTennisWeather === 'sunny'
+		if (!allTournaments) return [];
+		return tableTennisWeather === 'sunny'
 			? allTournaments.filter(t => t.name === '卓球（晴天時）')
 			: allTournaments.filter(t => t.name.includes('雨天時')); // Use includes for more flexible matching
 	}
