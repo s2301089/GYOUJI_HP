@@ -89,7 +89,12 @@ func main() {
 	attendanceService := service.NewAttendanceService(attendanceRepository)
 	attendanceHandler := handler.NewAttendanceHandler(attendanceService)
 
-	r := router.SetupRouter(userHandler, tournamentHandler, matchHandler, jwtSecret, scoreHandler, relayHandler, attendanceHandler)
+	// Setting用DI
+	settingRepository := repository.NewSettingRepository(db)
+	settingService := service.NewSettingService(settingRepository)
+	settingHandler := handler.NewSettingHandler(settingService)
+
+	r := router.SetupRouter(userHandler, tournamentHandler, matchHandler, jwtSecret, scoreHandler, relayHandler, attendanceHandler, settingHandler)
 	log.Println("Server is running on port 8080")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("failed to run server: %v", err)

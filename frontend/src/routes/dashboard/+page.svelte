@@ -44,6 +44,7 @@
 	// Score
 	let scores = [];
 	let scoresLoading = false;
+	let showTotalScores = true; // Default value
 
 	// Attendance
 	let attendanceScores = [];
@@ -64,6 +65,7 @@
 	import { onMount } from 'svelte';
 	onMount(async () => {
 		await fetchUser();
+		await fetchVisibility();
 		await fetchTournament('volleyball');
 		await fetchClassNameMap();
 		if (userRole === 'superroot') {
@@ -81,7 +83,6 @@
 				userRole = user.role || '';
 				assignedSport = user.assigned_sport || '';
 			} else {
-				// トークンがない、または無効な場合はログインページにリダイレクト
 				goto('/login');
 			}
 		} catch (e) {
@@ -105,6 +106,35 @@
 
 	// --- Data Fetching ---
 
+	async function fetchVisibility() {
+		try {
+			const res = await fetch('/api/settings/visibility', {
+				credentials: 'include'
+			});
+			if (res.ok) {
+				const data = await res.json();
+				showTotalScores = data.showTotalScores;
+			}
+		} catch (e) {
+			console.error('Failed to fetch visibility settings', e);
+		}
+	}
+
+	async function updateVisibility(newValue) {
+		try {
+			await fetch('/api/settings/visibility', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ showTotalScores: newValue })
+			});
+		} catch (e) {
+			console.error('Failed to update visibility settings', e);
+			// Optionally, revert the UI change
+			showTotalScores = !newValue;
+		}
+	}
+
 	async function fetchTournament(sport) {
 		selectedSport = sport;
 		isLoading = true;
@@ -112,16 +142,13 @@
 		selectedTournament = null;
 		try {
 			let url = `/api/tournaments/${sport}`;
-			// NOTE: The weather parameter is now handled by the frontend filtering
 			const res = await fetch(url, {
 				credentials: 'include'
 			});
 			if (res.ok) {
 				const data = await res.json();
-				console.log('Fetched tournaments data:', data); // DEBUG
 				if (data && data.length > 0) {
 					allTournaments = data;
-					// After fetching, immediately filter and select the correct tournament
 					if (sport === 'table_tennis') {
 						const filtered = getFilteredTableTennisTournaments();
 						selectTournament(filtered[0]);
@@ -199,36 +226,29 @@
 			});
 			if (res.ok) {
 				let data = await res.json();
-				
-				// 新しいAPIレスポンス形式に対応
 				if (data && data.rankings && Object.keys(data.rankings).length > 0) {
-					// rankings: {1: 3, 2: 1, 3: 5, 4: 2, 5: 4, 6: 6} の形式
-					// 順位 -> 学年のマッピングを順位順のリストに変換
 					const formattedData = Object.entries(data.rankings)
 						.sort(([rankA], [rankB]) => parseInt(rankA) - parseInt(rankB))
 						.map(([rank, grade]) => ({
-							id: `relay-${type}-${rank}-${grade}-${Date.now()}`, // より一意なID
+							id: `relay-${type}-${rank}-${grade}-${Date.now()}`,
 							rank: parseInt(rank),
 							grade: parseInt(grade),
 							relay_type: type
 						}));
 					relayResults = formattedData;
 				} else {
-					// データがない場合の処理
 					if (userRole === 'superroot' || userRole === 'admin_relay') {
-						// 管理者の場合は編集用のデフォルトデータを作成
-						relayResults = [1, 2, 3, 4, 5, 6].map(rank => ({
-							id: `relay-${type}-${rank}-${Date.now()}`, // より一意なID
-							rank: rank,
-							grade: rank, // デフォルトで順番通り
-							relay_type: type
-						}));
-					} else {
-						// 一般ユーザーの場合は空のデータ（学年なし）を作成
 						relayResults = [1, 2, 3, 4, 5, 6].map(rank => ({
 							id: `relay-${type}-${rank}-${Date.now()}`,
 							rank: rank,
-							grade: null, // 学年は空
+							grade: rank,
+							relay_type: type
+						}));
+					} else {
+						relayResults = [1, 2, 3, 4, 5, 6].map(rank => ({
+							id: `relay-${type}-${rank}-${Date.now()}`,
+							rank: rank,
+							grade: null,
 							relay_type: type
 						}));
 					}
@@ -280,9 +300,7 @@
     }
 
 	function toggleTableTennisWeather() {
-		console.log('Toggling weather...'); // DEBUG
 		tableTennisWeather = tableTennisWeather === 'sunny' ? 'rainy' : 'sunny';
-		console.log('New weather:', tableTennisWeather); // DEBUG
 		fetchTournament('table_tennis');
 		fetchMatches('table_tennis');
 	}
@@ -299,7 +317,7 @@
 		if (!allTournaments) return [];
 		return tableTennisWeather === 'sunny'
 			? allTournaments.filter(t => t.name === '卓球（晴天時）')
-			: allTournaments.filter(t => t.name.includes('雨天時')); // Use includes for more flexible matching
+			: allTournaments.filter(t => t.name.includes('雨天時'));
 	}
 
 	function selectTournament(tournamentData) {
@@ -354,21 +372,19 @@
 	}
 
 	function handleDndConsider(event) {
-		// ドラッグ中の一時的な状態更新
 		if (event.detail.items && Array.isArray(event.detail.items)) {
 			relayResults = event.detail.items.map((item, index) => ({
 				...item,
-				rank: index + 1 // 順位を更新
+				rank: index + 1
 			}));
 		}
 	}
 
 	function handleDndFinalize(event) {
-		// ドロップ完了時の最終状態更新
 		if (event.detail.items && Array.isArray(event.detail.items)) {
 			relayResults = event.detail.items.map((item, index) => ({
 				...item,
-				rank: index + 1 // 順位を更新
+				rank: index + 1
 			}));
 		}
 	}
@@ -382,10 +398,9 @@
 			return;
 		}
 
-		// 新しいAPI形式に合わせて順位 -> 学年のマッピングを作成
 		const rankings = {};
 		relayResults.forEach((result, index) => {
-			rankings[index + 1] = result.grade; // 順位(1-6) -> 学年(1-6)
+			rankings[index + 1] = result.grade;
 		});
 
 		const body = { rankings };
@@ -459,7 +474,7 @@
 
 			if (res.ok) {
 				attendanceUpdateStatus = 'success';
-				await fetchScores(); // スコア表を更新
+				await fetchScores();
 			} else {
 				attendanceUpdateStatus = 'error';
 				const errorData = await res.json();
@@ -498,56 +513,27 @@
         { name: '現在の順位', key: 'current_rank' },
     ];
 
-	// 順位を計算する関数
-	/**
- 	* スコアの配列を受け取り、順位（current_rank）を追加して返す関数
- 	* @param {Array} scoresData 各クラスのスコアオブジェクトの配列
- 	* @returns {Array} `current_rank` プロパティが追加された新しい配列
- 	*/
 	function calculateRanks(scoresData) {
-    	// データが空なら何もしない
     	if (!scoresData || scoresData.length === 0) {
         	return [];
     	}
-
-    	// --- 手順1: 合計点（total_including_init）で全クラスを並び替える ---
-    	// これが「各クラスで比較して」の部分です。
-    	// 元の配列を壊さないようにコピー(`...scoresData`)してからソートします。
     	const sorted = [...scoresData].sort((a, b) => b.total_including_init - a.total_including_init);
-    
-    	// --- 手順2: 順位を決定し、Mapオブジェクトに保存する ---
-    	// これが「順位付けすれば」の部分です。
     	const rankMap = new Map();
     	let rank = 1;
-
     	for (let i = 0; i < sorted.length; i++) {
-        	// 前のクラスよりスコアが低い場合、順位をその位置（i + 1）に更新します。
-        	// 同じスコア（同点）の場合は、このif文に入らないため、同じ順位が維持されます。
         	if (i > 0 && sorted[i].total_including_init < sorted[i - 1].total_including_init) {
             	rank = i + 1;
         	}
-        	// 「クラス名」をキーにして、決定した順位を保存します。
-        	// 例: rankMap.set('1-1', 5);
         	rankMap.set(sorted[i].class_name, rank);
     	}
-
-    	// --- 手順3: 元の配列の順番を維持したまま、順位を合体させる ---
-    	// 画面の表示順を変えずに、計算した順位だけを追加します。
     	return scoresData.map(s => ({
-        	...s, // 元のスコアデータはそのまま
-        	current_rank: rankMap.get(s.class_name) // Mapからクラス名に対応する順位を取得して追加
+        	...s,
+        	current_rank: rankMap.get(s.class_name)
     	}));
 	}
 
-	// スコアデータに順位を追加
 	$: scoresWithRanks = scores.length > 0 ? calculateRanks(scores) : [];
 
-	let showTotalScores = (typeof window !== 'undefined' && localStorage.getItem('showTotalScores')) === 'false' ? false : true;
-
-	// A reactive statement to update localStorage whenever the switch is toggled.
-	$: if (typeof window !== 'undefined') {
-    	localStorage.setItem('showTotalScores', String(showTotalScores));
-	}
 </script>
 
 <div class="dashboard-container">
@@ -633,7 +619,7 @@
             	<div class="visibility-switcher">
                 	<span>合計・順位の表示:</span>
                 	<label class="switch">
-                    	<input type="checkbox" bind:checked={showTotalScores}>
+                    	<input type="checkbox" bind:checked={showTotalScores} on:change={() => updateVisibility(showTotalScores)}>
                     	<span class="slider"></span>
                 	</label>
                 	<span>{showTotalScores ? '表示中' : '非表示'}</span>
@@ -646,7 +632,7 @@
                 	<div class="score-category-column">
                     	<div class="score-header">得点項目</div>
                     	{#each scoreCategories as category, i}
-                        	{#if showTotalScores || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
+                        	{#if (showTotalScores && userRole === 'superroot') || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
                             	<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
                         	{/if}
                     	{/each}
@@ -656,7 +642,7 @@
                         	<div class="score-column">
                             	<div class="score-header">{s.class_name}</div>
                             	{#each scoreCategories as category, i}
-                                	{#if showTotalScores || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
+                                	{#if (showTotalScores && userRole === 'superroot') || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
                                     	<div class="score-cell" class:odd-row={i % 2 === 0} class:rank-cell={category.key === 'current_rank'}>
                                         	{#if category.key === 'current_rank'}
                                             	<span class="rank-badge rank-{s[category.key]}">{s[category.key]}位</span>
