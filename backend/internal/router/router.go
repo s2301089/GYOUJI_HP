@@ -59,6 +59,8 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 		// Settings
 		api.GET("/settings/visibility", middleware.AuthMiddleware(jwtSecret), settingHandler.GetVisibility)
 		api.PUT("/settings/visibility", middleware.AuthMiddleware(jwtSecret), middleware.SuperrootOnly(), settingHandler.UpdateVisibility)
+		api.GET("/settings/weather", middleware.AuthMiddleware(jwtSecret), settingHandler.GetWeather)
+		api.PUT("/settings/weather", middleware.AuthMiddleware(jwtSecret), middleware.TableTennisAdminOnly(), settingHandler.UpdateWeather)
 
 		// 試合スコア更新API（認証必須）
 		api.PUT("/matches/:id", middleware.AuthMiddleware(jwtSecret), matchHandler.UpdateMatchScore)
@@ -67,7 +69,7 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 		// リレー関連
 		api.GET("/relay", relayHandler.GetRelayRankings)
 		api.POST("/relay", middleware.AuthMiddleware(jwtSecret), relayHandler.RegisterRelayRankings)
-		
+
 		// 出席点関連（superrootのみ）
 		api.GET("/attendance", middleware.AuthMiddleware(jwtSecret), attendanceHandler.GetAttendanceScores)
 		api.PUT("/attendance/:class_id", middleware.AuthMiddleware(jwtSecret), attendanceHandler.UpdateAttendanceScore)

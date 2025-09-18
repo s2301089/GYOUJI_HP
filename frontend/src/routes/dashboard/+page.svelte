@@ -30,8 +30,9 @@
 	let selectedTournament = null;
 	let bracketContainer;
 	let selectedSport = '';
-	let tableTennisWeather = (typeof window !== 'undefined' && localStorage.getItem('tableTennisWeather')) || 'sunny';
+	let tableTennisWeather = 'sunny';
 	let isRainyChecked = false;
+	$: isRainyChecked = tableTennisWeather === 'rainy';
 
 	// Match Input
 	let matchesBySport = {};
@@ -66,6 +67,7 @@
 	onMount(async () => {
 		await fetchUser();
 		await fetchVisibility();
+		await fetchWeather();
 		await fetchTournament('volleyball');
 		await fetchClassNameMap();
 		if (userRole === 'superroot') {
@@ -132,6 +134,33 @@
 			console.error('Failed to update visibility settings', e);
 			// Optionally, revert the UI change
 			showTotalScores = !newValue;
+		}
+	}
+
+	async function fetchWeather() {
+		try {
+			const res = await fetch('/api/settings/weather', {
+				credentials: 'include'
+			});
+			if (res.ok) {
+				const data = await res.json();
+				tableTennisWeather = data.tableTennisWeather;
+			}
+		} catch (e) {
+			console.error('Failed to fetch weather settings', e);
+		}
+	}
+
+	async function updateWeather(newValue) {
+		try {
+			await fetch('/api/settings/weather', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ tableTennisWeather: newValue })
+			});
+		} catch (e) {
+			console.error('Failed to update weather settings', e);
 		}
 	}
 
@@ -292,18 +321,6 @@
 		}
 	}
 
-	$: isRainyChecked = tableTennisWeather === 'rainy';
-	$: {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('tableTennisWeather', tableTennisWeather);
-        }
-    }
-
-	function toggleTableTennisWeather() {
-		tableTennisWeather = tableTennisWeather === 'sunny' ? 'rainy' : 'sunny';
-		fetchTournament('table_tennis');
-		fetchMatches('table_tennis');
-	}
 
 	function getFilteredTableTennisMatches() {
 		const allTableTennisMatches = matchesBySport['table_tennis'] ?? [];
@@ -545,6 +562,9 @@
 			{#if userRole === 'superroot' || userRole === 'admin' || userRole === 'admin_relay'}
 				<button class:active={activeTab === 'input'} on:click={handleInputTabClick}>試合結果入力</button>
 			{/if}
+			{#if userRole === 'superroot'}
+				<a href="/dashboard/settings" class="nav-button">設定</a>
+			{/if}
 		</nav>
 		<button class="logout-btn" on:click={logout}>ログアウト</button>
 	</header>
@@ -560,7 +580,11 @@
 				<div class="weather-switcher">
 					<span>卓球トーナメント天候:</span>
 					<label class="switch">
-						<input type="checkbox" bind:checked={isRainyChecked} on:change={toggleTableTennisWeather}>
+						<input type="checkbox" checked={isRainyChecked} on:change={() => {
+							tableTennisWeather = tableTennisWeather === 'sunny' ? 'rainy' : 'sunny';
+							updateWeather(tableTennisWeather);
+							fetchTournament('table_tennis');
+						}}>
 						<span class="slider"></span>
 					</label>
 					<span>{tableTennisWeather === 'sunny' ? '晴天' : '雨天'}</span>
@@ -632,7 +656,7 @@
                 	<div class="score-category-column">
                     	<div class="score-header">得点項目</div>
                     	{#each scoreCategories as category, i}
-                        	{#if (showTotalScores && userRole === 'superroot') || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
+                        	{#if showTotalScores  || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
                             	<div class="score-cell" class:odd-row={i % 2 === 0}><b>{category.name}</b></div>
                         	{/if}
                     	{/each}
@@ -642,7 +666,7 @@
                         	<div class="score-column">
                             	<div class="score-header">{s.class_name}</div>
                             	{#each scoreCategories as category, i}
-                                	{#if (showTotalScores && userRole === 'superroot') || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
+                                	{#if showTotalScores  || (category.key !== 'total_excluding_init' && category.key !== 'total_including_init' && category.key !== 'current_rank')}
                                     	<div class="score-cell" class:odd-row={i % 2 === 0} class:rank-cell={category.key === 'current_rank'}>
                                         	{#if category.key === 'current_rank'}
                                             	<span class="rank-badge rank-{s[category.key]}">{s[category.key]}位</span>
@@ -829,7 +853,7 @@
         	<div class="modal-content" on:click|stopPropagation>
             	<h3>試合結果を更新しますか？</h3>
 				<p>ID: {editingMatch.id}, R: {editingMatch.round}</p>
-				<p>{editingMatch.team1_name || '-'} vs {editingMatch.team2_name || '-'}</p>
+				<p>{editingMatch.team1_name || '-'} vs {editingMatch.team2_name || '-'} </p>
 				<p>スコア: {editingMatch.team1_score} - {editingMatch.team2_score}</p>
             	<p>本当にこの内容で更新してよろしいですか？</p>
             	<div class="modal-actions">
@@ -1009,6 +1033,18 @@
 	.modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
 	.modal-actions button { background: #ccc; }
 	.modal-actions .ok-btn { background: #4285f4; }
+
+	.nav-button {
+		padding: 0.5rem 1rem;
+		color: white;
+		background-color: #5a5a5a;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: background-color 0.3s;
+		text-decoration: none;
+		display: inline-block;
+	}
 
 	/* Responsive */
 	@media (max-width: 768px) {
