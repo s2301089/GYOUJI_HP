@@ -4,6 +4,20 @@
   import { page } from '$app/stores';
   import { derived } from 'svelte/store';
 
+  onMount(async () => {
+    const { registerSW } = await import('virtual:pwa-register');
+    registerSW({
+      onNeedRefresh() {
+        if (confirm('新しいバージョンがあります。更新しますか？')) {
+          window.location.reload();
+        }
+      },
+      onOfflineReady() {
+        alert('オフラインで利用可能です。');
+      },
+    });
+  });
+
   let isMobileMenuOpen = false;
 
   const toggleMobileMenu = () => {
