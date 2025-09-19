@@ -32,3 +32,28 @@
 <div style="text-align: center;">
 <img src="image-3.png" alt="得点">
 </div>
+
+それぞれのクラスの得点と順位を確認できます。   
+当日15時から総合点及び順位を非表示にします。
+
+## 4. PWA
+
+今回のこのwebアプリはモバイルアプリとしてもご利用いただけます。  
+ぜひご活用ください。
+
+### iOS
+
+<div style="text-align: center;"><img src="image-4.png" alt="PWA-IOS-1" width="50%"></div>
+<div style="text-align: center;"><img src="image-5.png" alt="PWA-IOS-2" width="50%"></div>
+<div style="text-align: center;"><img src="image-6.png" alt="PWA-IOS-3" width="50%"></div>
+<div style="text-align: center;"><img src="image-7.png" alt="PWA-IOS-4" width="50%"></div>
+
+### Android
+
+<div style="text-align: center;"><img src="image-8.png" alt="PWA-Android-1" width="50%"></div>
+<div style="text-align: center;"><img src="image-9.png" alt="PWA-Android-3" width="50%"></div>
+<div style="text-align: center;"><img src="image-10.png" alt="PWA-Android-4" width="50%"></div>
+
+---
+
+インストール後、アイコンが表示されます。そのアイコンをクリックすることで、アプリを起動できます。
