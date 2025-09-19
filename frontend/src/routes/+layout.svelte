@@ -6,6 +6,7 @@
 
   onMount(async () => {
     const { registerSW } = await import('virtual:pwa-register');
+    let notified = false;
     registerSW({
       onNeedRefresh() {
         if (confirm('新しいバージョンがあります。更新しますか？')) {
@@ -13,7 +14,10 @@
         }
       },
       onOfflineReady() {
-        alert('オフラインで利用可能です。');
+        if (!notified) {
+          alert('オフラインで利用可能です。');
+          notified = true;
+        }
       },
     });
   });
