@@ -268,7 +268,7 @@
 						}));
 					relayResults = formattedData;
 				} else {
-					if (userRole === 'superroot' || userRole === 'admin_relay') {
+					if (userRole === 'superroot' || (userRole === 'admin' && assignedSport === 'relay')) {
 						relayResults = [1, 2, 3, 4, 5, 6].map(rank => ({
 							id: `relay-${type}-${rank}-${Date.now()}`,
 							rank: rank,
@@ -313,7 +313,7 @@
 
 	function handleInputTabClick() {
 		activeTab = 'input';
-		if (userRole === 'admin_relay') {
+		if (userRole === 'admin' && assignedSport === 'relay') {
 			activeInputTab = 'relay';
 			fetchRelayResults(relayType);
 		} else {
