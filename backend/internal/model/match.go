@@ -17,3 +17,7 @@ type MatchResponse struct {
 	NextMatchID        *int64  `json:"next_match_id"`
 	TournamentName     *string `json:"tournament_name,omitempty"`
 }
+
+type SuccessResponse struct {
+	Message string `json:"message" example:"処理が正常に完了しました"`
+}

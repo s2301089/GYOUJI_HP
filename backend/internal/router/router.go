@@ -66,6 +66,8 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 		api.PUT("/matches/:id", middleware.AuthMiddleware(jwtSecret), matchHandler.UpdateMatchScore)
 		// 試合一覧取得API（認証必須）
 		api.GET("/matches/:sport", middleware.AuthMiddleware(jwtSecret), matchHandler.GetMatchesBySport)
+		// 試合リセットAPI (superrootのみ)
+		api.POST("/matches/:id/reset", middleware.AuthMiddleware(jwtSecret), middleware.SuperrootOnly(), matchHandler.ResetMatch)
 		// リレー関連
 		api.GET("/relay", relayHandler.GetRelayRankings)
 		api.POST("/relay", middleware.AuthMiddleware(jwtSecret), relayHandler.RegisterRelayRankings)

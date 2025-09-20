@@ -40,6 +40,8 @@
 	let showConfirmModal = false;
 	let editingMatch = null;
 	let editingSport = '';
+	let showResetConfirmModal = false;
+	let resettingMatch = null;
 	let activeInputTab = 'tournament'; // 'tournament' | 'relay'
 
 	// Score
@@ -388,6 +390,33 @@
 		editingSport = '';
 	}
 
+	function confirmResetMatch() {
+		if (resettingMatch && editingSport) {
+			resetMatch(resettingMatch, editingSport);
+			location.reload();
+		}
+		showResetConfirmModal = false;
+		resettingMatch = null;
+		editingSport = '';
+	}
+
+	async function resetMatch(match, sport) {
+		try {
+			const res = await fetch(`/api/matches/${match.id}/reset`, {
+				method: 'POST',
+				credentials: 'include'
+			});
+			match._updateStatus = res.ok ? 'success' : 'error';
+		} catch (e) {
+			match._updateStatus = 'error';
+		}
+		setTimeout(() => { match._updateStatus = ''; }, 2000);
+		await fetchMatches(sport);
+		if (sport === 'table_tennis') {
+			matchesBySport['table_tennis'] = [...(matchesBySport['table_tennis'] ?? [])];
+		}
+	}
+
 	function handleDndConsider(event) {
 		if (event.detail.items && Array.isArray(event.detail.items)) {
 			relayResults = event.detail.items.map((item, index) => ({
@@ -726,6 +755,9 @@
 														<span>{m.team2_name}</span>
 													</div>
 													<button type="submit" class="update-btn">更新</button>
+													{#if userRole === 'superroot'}
+														<button type="button" class="reset-btn" on:click={() => { showResetConfirmModal = true; resettingMatch = m; editingSport = sport; }}>リセット</button>
+													{/if}
 													{#if m._updateStatus}
 														<span class="update-status {m._updateStatus}">{m._updateStatus === 'success' ? '✓' : '✗'}</span>
 													{/if}
@@ -737,6 +769,9 @@
 													<span>{m.tournament_name}</span>
 													<span>{m.team1_name} {m.team1_score} - {m.team2_score} {m.team2_name}</span>
 													<span class="update-status success">試合終了</span>
+													{#if userRole === 'superroot'}
+														<button type="button" class="reset-btn" on:click={() => { showResetConfirmModal = true; resettingMatch = m; editingSport = sport; }}>リセット</button>
+													{/if}
 												</div>
 											{/if}
 										</div>
@@ -761,6 +796,9 @@
 														<span>{m.team2_name}</span>
 													</div>
 													<button type="submit" class="update-btn">更新</button>
+													{#if userRole === 'superroot'}
+														<button type="button" class="reset-btn" on:click={() => { showResetConfirmModal = true; resettingMatch = m; editingSport = sport; }}>リセット</button>
+													{/if}
 													{#if m._updateStatus}
 														<span class="update-status {m._updateStatus}">{m._updateStatus === 'success' ? '✓' : '✗'}</span>
 													{/if}
@@ -772,6 +810,9 @@
 													<span>{m.tournament_name}</span>
 													<span>{m.team1_name} {m.team1_score} - {m.team2_score} {m.team2_name}</span>
 													<span class="update-status success">試合終了</span>
+													{#if userRole === 'superroot'}
+														<button type="button" class="reset-btn" on:click={() => { showResetConfirmModal = true; resettingMatch = m; editingSport = sport; }}>リセット</button>
+													{/if}
 												</div>
 											{/if}
 										</div>
@@ -860,6 +901,21 @@
         	</div>
     	</div>
 	{/if}
+
+	{#if showResetConfirmModal}
+		<div class="modal-overlay" on:click={() => showResetConfirmModal = false}>
+			<div class="modal-content" on:click|stopPropagation>
+				<h3>試合をリセットしますか？</h3>
+				<p>ID: {resettingMatch.id}, R: {resettingMatch.round}</p>
+				<p>{resettingMatch.team1_name || '-'} vs {resettingMatch.team2_name || '-'}</p>
+				<p>この操作は元に戻せません。本当にこの試合をリセットしてよろしいですか？</p>
+				<div class="modal-actions">
+					<button class="cancel-btn" on:click={() => { showResetConfirmModal = false; resettingMatch = null; editingSport = ''; }}>キャンセル</button>
+					<button on:click={confirmResetMatch} class="reset-btn">リセット</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -876,6 +932,13 @@
 		background: #4285f4; 
 		margin-top: 1.5rem; 
 		transition: all 0.2s ease;
+	}
+	.reset-btn {
+		background-color: #d93025 !important;
+	}
+	.cancel-btn {
+		background-color: #f0f0f0;
+		color: #333;
 	}
 	.update-btn:hover:not(:disabled) { 
 		background: #3367d6; 

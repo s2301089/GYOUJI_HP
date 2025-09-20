@@ -9,6 +9,7 @@ import (
 type MatchServiceInterface interface {
 	UpdateMatchScore(matchID int, team1Score int, team2Score int, user interface{}) (interface{}, error)
 	GetMatchesBySport(sport string) ([]model.MatchResponse, error)
+	ResetMatch(matchID int, user interface{}) error
 }
 
 type MatchService struct {
@@ -25,4 +26,8 @@ func (s *MatchService) UpdateMatchScore(matchID int, team1Score int, team2Score 
 
 func (s *MatchService) GetMatchesBySport(sport string) ([]model.MatchResponse, error) {
 	return s.Repo.GetMatchesBySport(sport)
+}
+
+func (s *MatchService) ResetMatch(matchID int, user interface{}) error {
+	return s.Repo.ResetMatch(matchID, user)
 }

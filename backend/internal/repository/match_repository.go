@@ -511,3 +511,84 @@ func (r *MatchRepository) GetMatchesBySport(sport string) ([]model.MatchResponse
 
 	return results, nil
 }
+
+func (r *MatchRepository) ResetMatch(matchID int, user interface{}) error {
+	userMap, ok := user.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unauthorized")
+	}
+	role, _ := userMap["role"].(string)
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			log.Printf("Rolling back transaction due to error: %v", err)
+			tx.Rollback()
+		}
+	}()
+
+	var matchSport string
+	var previousWinnerID sql.NullInt64
+	query := `
+		SELECT t.sport, m.winner_team_id
+		FROM matches m JOIN tournaments t ON m.tournament_id = t.id
+		WHERE m.id = ?`
+	err = tx.QueryRow(query, matchID).Scan(&matchSport, &previousWinnerID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("not found")
+		}
+		return fmt.Errorf("failed to query initial match: %w", err)
+	}
+
+	if role != "superroot" {
+		return fmt.Errorf("forbidden")
+	}
+
+	if !previousWinnerID.Valid {
+		return fmt.Errorf("match result not submitted yet")
+	}
+
+	if err := r.resetMatchResult(tx, matchID); err != nil {
+		return fmt.Errorf("failed to reset match result: %w", err)
+	}
+
+	// 試合自体の結果をリセット
+	_, err = tx.Exec(`UPDATE matches SET team1_score = NULL, team2_score = NULL, winner_team_id = NULL, status = NULL WHERE id = ?`, matchID)
+	if err != nil {
+		return fmt.Errorf("failed to reset match scores and status: %w", err)
+	}
+
+	// 晴天時卓球の場合、雨天時もリセット
+	var tournamentName string
+	err = tx.QueryRow(`SELECT name FROM tournaments WHERE sport = 'table_tennis' AND id = (SELECT tournament_id FROM matches WHERE id = ?)`, matchID).Scan(&tournamentName)
+	if err == nil && tournamentName == "卓球（晴天時）" {
+		var rainyMatchID int
+		rainyQuery := `
+			SELECT m_rainy.id
+			FROM matches m_sunny
+			JOIN tournaments t_rainy ON t_rainy.name = '卓球（雨天時）'
+			JOIN matches m_rainy ON m_rainy.tournament_id = t_rainy.id 
+				AND m_rainy.round = m_sunny.round 
+				AND m_rainy.match_number_in_round = m_sunny.match_number_in_round
+			WHERE m_sunny.id = ?`
+		err = tx.QueryRow(rainyQuery, matchID).Scan(&rainyMatchID)
+		if err == nil {
+			if err := r.resetMatchResult(tx, rainyMatchID); err != nil {
+				return fmt.Errorf("failed to reset rainy match result: %w", err)
+			}
+			_, err = tx.Exec(`UPDATE matches SET team1_score = NULL, team2_score = NULL, winner_team_id = NULL, status = NULL WHERE id = ?`, rainyMatchID)
+			if err != nil {
+				return fmt.Errorf("failed to reset rainy match scores and status: %w", err)
+			}
+		}
+	}
+
+	return tx.Commit()
+}

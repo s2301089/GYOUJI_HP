@@ -115,3 +115,48 @@ func (h *MatchHandler) UpdateMatchScore(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, result)
 }
+
+// POST /api/matches/:id/reset
+// ResetMatch godoc
+// @Summary      試合結果をリセット
+// @Description  指定されたIDの試合結果をリセットします。superrootのみアクセス可能。
+// @Tags         matches
+// @Produce      json
+// @Param        id   path      int  true  "試合ID"
+// @Param        Authorization header string true "Bearerトークン"
+// @Success      200  {object}  model.SuccessResponse "試合結果が正常にリセットされました。"
+// @Failure      400  {object}  model.ErrorResponse "無効なリクエストです (Invalid match ID)"
+// @Failure      401  {object}  model.ErrorResponse "認証が必要です (Unauthorized)"
+// @Failure      403  {object}  model.ErrorResponse "権限がありません (Forbidden)"
+// @Failure      404  {object}  model.ErrorResponse "試合が見つかりません (Match not found)"
+// @Failure      500  {object}  model.ErrorResponse "サーバー内部エラー"
+// @Router       /api/matches/{id}/reset [post]
+// @Security     ApiKeyAuth
+func (h *MatchHandler) ResetMatch(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	if err := h.Service.ResetMatch(id, user); err != nil {
+		if err.Error() == "forbidden" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You do not have permission to reset this match."})
+			return
+		} else if err.Error() == "not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Match not found."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Match result reset successfully"})
+}
