@@ -1,6 +1,6 @@
 # 結果速報webアプリの使い方
 
-これは、全体大会のEXCELの結果速報をwebアプリ化したものである。  
+これは、前回大会のEXCELの結果速報をwebアプリ化したものである。  
 以下のURLまたはQRコードからアクセスできる。
 
 [https://nitsche-gyouji.com](https://nitsche-gyouji.com)
