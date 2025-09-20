@@ -88,6 +88,9 @@
 
   <!-- Footer -->
   <footer>
+    <a  href="https://fest-snct.jp/2025/" target="_blank" rel="noopener noreferrer">
+    <img src="/kosenfest_bar.png" alt="Kosenfest Bar" class="footer-bar">
+    </a>
     <p>&copy; 2025 仙台高専広瀬キャンパス 行事委員会</p>
   </footer>
 </div>
@@ -222,8 +225,18 @@
     background-color: #333;
     color: white;
     text-align: center;
-    padding: 2rem 0;
+    padding: 0;
     margin-top: 4rem;
+  }
+
+  .footer-bar {
+    width: 100%;
+    display: block;
+  }
+
+  footer p {
+    padding: 2rem 0;
+    margin: 0;
   }
 
   @media (max-width: 768px) {
