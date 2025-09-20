@@ -562,9 +562,6 @@
 			{#if userRole === 'superroot' || userRole === 'admin' || userRole === 'admin_relay'}
 				<button class:active={activeTab === 'input'} on:click={handleInputTabClick}>試合結果入力</button>
 			{/if}
-			{#if userRole === 'superroot'}
-				<a href="/dashboard/settings" class="nav-button">設定</a>
-			{/if}
 		</nav>
 		<button class="logout-btn" on:click={logout}>ログアウト</button>
 	</header>
@@ -713,7 +710,7 @@
 								{#if sport === 'table_tennis'}
 									{#each getFilteredTableTennisMatches() as m (m.id)}
 										<div class="match-entry">
-											{#if m.status !== 'finished'}
+											{#if m.status !== 'finished' || userRole === 'superroot'}
 												<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
 													<div class="match-info">
 														<span>ID: {m.id}</span>
@@ -749,7 +746,7 @@
 								{:else}
 									{#each matchesBySport[sport] as m (m.id)}
 										<div class="match-entry">
-											{#if m.status !== 'finished'}
+											{#if m.status !== 'finished' || userRole === 'superroot'}
 												<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
 													<div class="match-info">
 														<span>ID: {m.id}</span>

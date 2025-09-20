@@ -39,17 +39,16 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 		}
 	}()
 
-	// loser_next_match_idとトーナメント名も取得する
 	var tournamentID int
-	var team1ID, team2ID, nextMatchID, loserNextMatchID sql.NullInt64
+	var team1ID, team2ID, nextMatchID, loserNextMatchID, previousWinnerID sql.NullInt64
 	var matchSport, tournamentName string
 	var currentRound int
 	query := `
         SELECT m.tournament_id, m.round, t.name, m.team1_id, m.team2_id, 
-               m.next_match_id, m.loser_next_match_id, t.sport
+               m.next_match_id, m.loser_next_match_id, t.sport, m.winner_team_id
         FROM matches m JOIN tournaments t ON m.tournament_id = t.id
         WHERE m.id = ?`
-	err = tx.QueryRow(query, matchID).Scan(&tournamentID, &currentRound, &tournamentName, &team1ID, &team2ID, &nextMatchID, &loserNextMatchID, &matchSport)
+	err = tx.QueryRow(query, matchID).Scan(&tournamentID, &currentRound, &tournamentName, &team1ID, &team2ID, &nextMatchID, &loserNextMatchID, &matchSport, &previousWinnerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("not found")
@@ -59,6 +58,15 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 
 	if !(role == "superroot" || (role == "admin" && assignedSport == matchSport)) {
 		return nil, fmt.Errorf("forbidden")
+	}
+
+	if previousWinnerID.Valid {
+		if role != "superroot" {
+			return nil, fmt.Errorf("match result already submitted")
+		}
+		if err := r.resetMatchResult(tx, matchID); err != nil {
+			return nil, fmt.Errorf("failed to reset match result: %w", err)
+		}
 	}
 
 	var winnerTeamID, loserTeamID sql.NullInt64
@@ -76,7 +84,6 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 		if err != nil {
 			// エラー処理: クエリが失敗したか、結果がなかった場合
 			log.Printf("Could not find class_id for winner team %d: %v", winnerTeamID.Int64, err)
-			// 必要に応じてロールバックやエラー返却
 		}
 	}
 	if loserTeamID.Valid {
@@ -180,6 +187,12 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 		}
 
 		if rainyMatchID != 0 {
+			if previousWinnerID.Valid { // If we are editing a result
+				if err := r.resetMatchResult(tx, rainyMatchID); err != nil {
+					return nil, fmt.Errorf("failed to reset rainy match result: %w", err)
+				}
+			}
+
 			// 雨天側の勝者/敗者は雨天トーナメントのチームIDで決定する
 			var rainyWinnerTeamID, rainyLoserTeamID sql.NullInt64
 			if team1Score > team2Score {
@@ -243,8 +256,8 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	if winnerTeamID.Valid && winnerClassID.Valid && matchSport == "table_tennis" && (tournamentName == "卓球（雨天時・敗者戦左側）" || tournamentName == "卓球（雨天時・敗者戦右側）") {
 		// 決勝ラウンド（1位決定戦）のみ加算
 		var cnt int
-		_ = tx.QueryRow(`SELECT COUNT(*) FROM matches WHERE tournament_id = ? AND round = ?`, tournamentID, currentRound).Scan(&cnt)
-		if cnt == 1 {
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM matches WHERE tournament_id = ? AND round > ?`, tournamentID, currentRound).Scan(&cnt)
+		if cnt == 0 {
 			_, err := tx.Exec("UPDATE team_points SET table_tennis_rainy_bonus_score = 10 WHERE class_id = ?", winnerClassID.Int64)
 			if err != nil {
 				return nil, err
@@ -257,6 +270,114 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	}
 
 	return r.getMatchByID(matchID)
+}
+
+// 以前の勝者・敗者を次の試合から削除し、関連する得点をすべて0にリセットする
+func (r *MatchRepository) resetMatchResult(tx *sql.Tx, matchID int) error {
+	var tournamentID, currentRound int
+	var team1ID, team2ID, nextMatchID, loserNextMatchID, previousWinnerID sql.NullInt64
+	var matchSport, tournamentName string
+
+	query := `
+        SELECT m.tournament_id, m.round, t.name, m.team1_id, m.team2_id, 
+               m.next_match_id, m.loser_next_match_id, t.sport, m.winner_team_id
+        FROM matches m JOIN tournaments t ON m.tournament_id = t.id
+        WHERE m.id = ?`
+	err := tx.QueryRow(query, matchID).Scan(&tournamentID, &currentRound, &tournamentName, &team1ID, &team2ID, &nextMatchID, &loserNextMatchID, &matchSport, &previousWinnerID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("match not found for reset: %d", matchID)
+		}
+		return fmt.Errorf("failed to query match for reset: %w", err)
+	}
+
+	if !previousWinnerID.Valid {
+		return nil // Nothing to reset
+	}
+
+	var previousLoserID sql.NullInt64
+	if team1ID.Valid && previousWinnerID.Int64 == team1ID.Int64 {
+		previousLoserID = team2ID
+	} else if team2ID.Valid && previousWinnerID.Int64 == team2ID.Int64 {
+		previousLoserID = team1ID
+	}
+
+	if nextMatchID.Valid {
+		if _, err := tx.Exec("UPDATE matches SET team1_id = NULL WHERE id = ? AND team1_id = ?", nextMatchID.Int64, previousWinnerID.Int64); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("UPDATE matches SET team2_id = NULL WHERE id = ? AND team2_id = ?", nextMatchID.Int64, previousWinnerID.Int64); err != nil {
+			return err
+		}
+	}
+	if previousLoserID.Valid && loserNextMatchID.Valid {
+		if _, err := tx.Exec("UPDATE matches SET team1_id = NULL WHERE id = ? AND team1_id = ?", loserNextMatchID.Int64, previousLoserID.Int64); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("UPDATE matches SET team2_id = NULL WHERE id = ? AND team2_id = ?", loserNextMatchID.Int64, previousLoserID.Int64); err != nil {
+			return err
+		}
+	}
+
+	var previousWinnerClassID, previousLoserClassID sql.NullInt64
+	if previousWinnerID.Valid {
+		_ = tx.QueryRow("SELECT class_id FROM teams WHERE id = ?", previousWinnerID.Int64).Scan(&previousWinnerClassID)
+	}
+	if previousLoserID.Valid {
+		_ = tx.QueryRow("SELECT class_id FROM teams WHERE id = ?", previousLoserID.Int64).Scan(&previousLoserClassID)
+	}
+
+	isLoserBracket := tournamentName == "卓球（雨天時・敗者戦左側）" || tournamentName == "卓球（雨天時・敗者戦右側）"
+
+	if previousWinnerClassID.Valid && !isLoserBracket {
+		var scoreColumn string
+		switch currentRound {
+		case 1:
+			scoreColumn = matchSport + "1_score"
+		case 2:
+			scoreColumn = matchSport + "2_score"
+		case 3:
+			scoreColumn = matchSport + "3_score"
+		}
+		if scoreColumn != "" {
+			query := fmt.Sprintf("UPDATE team_points SET %s = 0 WHERE class_id = ?", scoreColumn)
+			if _, err := tx.Exec(query, previousWinnerClassID.Int64); err != nil {
+				return err
+			}
+		}
+
+		var maxRound int
+		_ = tx.QueryRow(`SELECT MAX(round) FROM matches WHERE tournament_id = ?`, tournamentID).Scan(&maxRound)
+		if currentRound == maxRound {
+			var maxNum, thisNum int
+			_ = tx.QueryRow(`SELECT MAX(match_number_in_round) FROM matches WHERE tournament_id = ? AND round = ?`, tournamentID, currentRound).Scan(&maxNum)
+			_ = tx.QueryRow(`SELECT match_number_in_round FROM matches WHERE id = ?`, matchID).Scan(&thisNum)
+			champCol := matchSport + "_championship_score"
+			if thisNum == maxNum || (thisNum == maxNum-1 && maxNum > 1) {
+				query := fmt.Sprintf("UPDATE team_points SET %s = 0 WHERE class_id = ?", champCol)
+				if _, err := tx.Exec(query, previousWinnerClassID.Int64); err != nil {
+					return err
+				}
+				if previousLoserClassID.Valid {
+					if _, err := tx.Exec(query, previousLoserClassID.Int64); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	if previousWinnerClassID.Valid && matchSport == "table_tennis" && isLoserBracket {
+		var cnt int
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM matches WHERE tournament_id = ? AND round > ?`, tournamentID, currentRound).Scan(&cnt)
+		if cnt == 0 {
+			if _, err := tx.Exec("UPDATE team_points SET table_tennis_rainy_bonus_score = 0 WHERE class_id = ?", previousWinnerClassID.Int64); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *MatchRepository) updateMatchAndProgress(tx *sql.Tx, matchID int, team1Score int, team2Score int, winnerTeamID, loserTeamID, nextMatchID, loserNextMatchID sql.NullInt64) error {
