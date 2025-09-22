@@ -39,8 +39,9 @@ type Score struct {
 }
 
 type TeamScore struct {
-	Team1Score *int `json:"team1_score" binding:"required"`
-	Team2Score *int `json:"team2_score" binding:"required"`
+	Team1Score   *int   `json:"team1_score" binding:"required"`
+	Team2Score   *int   `json:"team2_score" binding:"required"`
+	WinnerTeamID *int64 `json:"winner_team_id,omitempty"`
 }
 
 // BracketryContestant represents a participant (a team or player).

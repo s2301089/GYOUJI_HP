@@ -43,6 +43,8 @@
 	let showResetConfirmModal = false;
 	let resettingMatch = null;
 	let activeInputTab = 'tournament'; // 'tournament' | 'relay'
+	let showWinnerModal = false;
+	let selectedWinnerId = null;
 
 	// Score
 	let scores = [];
@@ -351,17 +353,41 @@
 		createBracket(selectedTournament, bracketContainer);
 	}
 
+	function handleSubmit(match, sport) {
+		editingMatch = match;
+		editingSport = sport;
+		const score1 = Number(match.team1_score);
+		const score2 = Number(match.team2_score);
+
+		if (score1 === score2) {
+			selectedWinnerId = match.team1_id; // Default selection
+			showWinnerModal = true;
+		} else {
+			showConfirmModal = true;
+		}
+	}
+
+	function confirmWinnerSelection() {
+		if (editingMatch) {
+			editingMatch.winner_team_id = parseInt(selectedWinnerId, 10);
+		}
+		showWinnerModal = false;
+		showConfirmModal = true; // Chain to the next modal
+	}
+
 
 	// --- API Updates ---
 
 	async function updateMatchScore(match, sport) {
 		const body = {
-			user: userRole,
-			team1_score: match.team1_score,
-			team2_score: match.team2_score,
-			winner_team_id: match.team1_score > match.team2_score ? match.team1_id : (match.team2_score > match.team1_score ? match.team2_id : null),
-			status: 'finished'
+			team1_score: Number(match.team1_score),
+			team2_score: Number(match.team2_score),
 		};
+
+		if (Number(match.team1_score) === Number(match.team2_score) && match.winner_team_id) {
+			body.winner_team_id = match.winner_team_id;
+		}
+
 		try {
 			const res = await fetch(`/api/matches/${match.id}`, {
 				method: 'PUT',
@@ -740,7 +766,7 @@
 									{#each getFilteredTableTennisMatches() as m (m.id)}
 										<div class="match-entry">
 											{#if m.status !== 'finished' || userRole === 'superroot'}
-												<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
+												<form class="match-edit-form" on:submit|preventDefault={() => handleSubmit(m, sport)}>
 													<div class="match-info">
 														<span>ID: {m.id}</span>
 														<span>R: {m.round}</span>
@@ -782,7 +808,7 @@
 									{#each matchesBySport[sport] as m (m.id)}
 										<div class="match-entry">
 											{#if m.status !== 'finished' || userRole === 'superroot'}
-												<form class="match-edit-form" on:submit|preventDefault={() => { showConfirmModal = true; editingMatch = m; editingSport = sport; }}>
+												<form class="match-edit-form" on:submit|preventDefault={() => handleSubmit(m, sport)}>
 													<div class="match-info">
 														<span>ID: {m.id}</span>
 														<span>R: {m.round}</span>
@@ -900,6 +926,30 @@
             	</div>
         	</div>
     	</div>
+	{/if}
+
+	{#if showWinnerModal}
+		<div class="modal-overlay" on:click={() => showWinnerModal = false}>
+			<div class="modal-content" on:click|stopPropagation>
+				<h3>勝者を選択してください</h3>
+				<p>スコアが同点のため、勝者をマニュアルで選択する必要があります。</p>
+				{#if editingMatch}
+					<p><b>{editingMatch.team1_name || '-'}</b> vs <b>{editingMatch.team2_name || '-'}</b></p>
+					<p>スコア: {editingMatch.team1_score} - {editingMatch.team2_score}</p>
+					<div class="winner-select-container">
+						<label for="winner-select">勝者:</label>
+						<select id="winner-select" bind:value={selectedWinnerId}>
+							<option value={editingMatch.team1_id}>{editingMatch.team1_name}</option>
+							<option value={editingMatch.team2_id}>{editingMatch.team2_name}</option>
+						</select>
+					</div>
+				{/if}
+				<div class="modal-actions">
+					<button on:click={() => { showWinnerModal = false; editingMatch = null; editingSport = ''; }}>キャンセル</button>
+					<button on:click={confirmWinnerSelection} class="ok-btn">OK</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 
 	{#if showResetConfirmModal}
@@ -1093,6 +1143,9 @@
 	.modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
 	.modal-actions button { background: #ccc; }
 	.modal-actions .ok-btn { background: #4285f4; }
+	.winner-select-container { margin: 1rem 0; }
+	.winner-select-container label { margin-right: 0.5rem; }
+	.winner-select-container select { padding: 0.5rem; border-radius: 4px; }
 
 	.nav-button {
 		padding: 0.5rem 1rem;

@@ -17,7 +17,7 @@ func NewMatchRepository(db *sql.DB) *MatchRepository {
 }
 
 // UpdateMatchScore は試合のスコアを更新し、勝者を次の試合へ進出させます。
-func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Score int, user interface{}) (interface{}, error) {
+func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Score int, winnerTeamIDReq *int64, user interface{}) (interface{}, error) {
 	userMap, ok := user.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("unauthorized")
@@ -77,6 +77,14 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 	} else if team2Score > team1Score {
 		winnerTeamID = team2ID
 		loserTeamID = team1ID
+	} else if team1Score == team2Score && winnerTeamIDReq != nil {
+		winnerTeamID.Int64 = *winnerTeamIDReq
+		winnerTeamID.Valid = true
+		if team1ID.Valid && winnerTeamID.Int64 == team1ID.Int64 {
+			loserTeamID = team2ID
+		} else if team2ID.Valid && winnerTeamID.Int64 == team2ID.Int64 {
+			loserTeamID = team1ID
+		}
 	}
 	// チームIDからclass_idを取得
 	if winnerTeamID.Valid {
@@ -201,6 +209,14 @@ func (r *MatchRepository) UpdateMatchScore(matchID int, team1Score int, team2Sco
 			} else if team2Score > team1Score {
 				rainyWinnerTeamID = rainyTeam2ID
 				rainyLoserTeamID = rainyTeam1ID
+			} else if team1Score == team2Score && winnerTeamID.Valid {
+				if winnerTeamID.Int64 == rainyTeam1ID.Int64 {
+					rainyWinnerTeamID = rainyTeam1ID
+					rainyLoserTeamID = rainyTeam2ID
+				} else if winnerTeamID.Int64 == rainyTeam2ID.Int64 {
+					rainyWinnerTeamID = rainyTeam2ID
+					rainyLoserTeamID = rainyTeam1ID
+				}
 			}
 
 			err = r.updateMatchAndProgress(tx, rainyMatchID, team1Score, team2Score, rainyWinnerTeamID, rainyLoserTeamID, rainyNextMatchID, rainyLoserNextMatchID)

@@ -101,7 +101,7 @@ func (h *MatchHandler) UpdateMatchScore(c *gin.Context) {
 		return
 	}
 
-	result, err := h.Service.UpdateMatchScore(id, *req.Team1Score, *req.Team2Score, user)
+	result, err := h.Service.UpdateMatchScore(id, *req.Team1Score, *req.Team2Score, req.WinnerTeamID, user)
 	if err != nil {
 		if err.Error() == "forbidden" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You do not have permission to update this match."})

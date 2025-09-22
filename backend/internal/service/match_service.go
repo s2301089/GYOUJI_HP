@@ -7,7 +7,7 @@ import (
 
 // インターフェース（テスト用）
 type MatchServiceInterface interface {
-	UpdateMatchScore(matchID int, team1Score int, team2Score int, user interface{}) (interface{}, error)
+	UpdateMatchScore(matchID int, team1Score int, team2Score int, winnerTeamID *int64, user interface{}) (interface{}, error)
 	GetMatchesBySport(sport string) ([]model.MatchResponse, error)
 	ResetMatch(matchID int, user interface{}) error
 }
@@ -20,8 +20,8 @@ func NewMatchService(r *repository.MatchRepository) *MatchService {
 	return &MatchService{Repo: r}
 }
 
-func (s *MatchService) UpdateMatchScore(matchID int, team1Score int, team2Score int, user interface{}) (interface{}, error) {
-	return s.Repo.UpdateMatchScore(matchID, team1Score, team2Score, user)
+func (s *MatchService) UpdateMatchScore(matchID int, team1Score int, team2Score int, winnerTeamID *int64, user interface{}) (interface{}, error) {
+	return s.Repo.UpdateMatchScore(matchID, team1Score, team2Score, winnerTeamID, user)
 }
 
 func (s *MatchService) GetMatchesBySport(sport string) ([]model.MatchResponse, error) {
