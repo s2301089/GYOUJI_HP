@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate } from 'svelte';
   import '../app.css';
   import { page } from '$app/stores';
   import { derived } from 'svelte/store';
@@ -42,6 +42,12 @@
 
   // ダッシュボード配下か判定
   const isDashboard = derived(page, $page => $page.url.pathname.startsWith('/dashboard'));
+
+  let showFooter = false;
+  afterUpdate(() => {
+    // 1回だけfooterを表示（初回描画後）
+    if (!showFooter) showFooter = true;
+  });
 </script>
 
 <div class="app-container">
@@ -85,14 +91,15 @@
   <main>
     <slot />
   </main>
-
+  {#if showFooter && $page.url.pathname !== '/login'}
   <!-- Footer -->
   <footer>
     <a  href="https://fest-snct.jp/2025/" target="_blank" rel="noopener noreferrer">
-    <img src="/kosenfest_bar.png" alt="Kosenfest Bar" class="footer-bar">
+      <img src="/kosenfest_bar.png" alt="Kosenfest Bar" class="footer-bar" loading="eager">
     </a>
     <p>&copy; 2025 仙台高専広瀬キャンパス 行事委員会</p>
   </footer>
+  {/if}
 </div>
 
 <style>

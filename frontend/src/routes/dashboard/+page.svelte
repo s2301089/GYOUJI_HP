@@ -651,13 +651,13 @@
 </svelte:head>
 
 <div class="dashboard-container">
-	<header>
-		<h1>ダッシュボード</h1>
+	<header class="dashboard-header">
+		<h1 class="dashboard-title">ダッシュボード</h1>
 		<nav class="dashboard-tabs">
-			<button class:active={activeTab === 'tournament'} on:click={() => { activeTab = 'tournament'; fetchTournament('volleyball'); }}>競技トーナメント</button>
-			<button class:active={activeTab === 'scores'} on:click={() => { activeTab = 'scores'; fetchScores(); }}>現在の得点</button>
+			<button class:active={activeTab === 'tournament'} on:click={() => { activeTab = 'tournament'; fetchTournament('volleyball'); }} class="dashboard-tab-btn">競技トーナメント</button>
+			<button class:active={activeTab === 'scores'} on:click={() => { activeTab = 'scores'; fetchScores(); }} class="dashboard-tab-btn">現在の得点</button>
 			{#if userRole === 'superroot' || userRole === 'admin' || userRole === 'admin_relay'}
-				<button class:active={activeTab === 'input'} on:click={handleInputTabClick}>試合結果入力</button>
+				<button class:active={activeTab === 'input'} on:click={handleInputTabClick} class="dashboard-tab-btn">試合結果入力</button>
 			{/if}
 		</nav>
 		<button class="logout-btn" on:click={logout}>ログアウト</button>
@@ -666,10 +666,10 @@
 	<main>
 		{#if activeTab === 'tournament'}
 			<div class="sports-buttons">
-				<button on:click={() => { relayActive = false; fetchTournament('volleyball'); }} class:active={selectedSport === 'volleyball' && !relayActive}>バレーボール</button>
-				<button on:click={() => { relayActive = false; fetchTournament('table_tennis'); }} class:active={selectedSport === 'table_tennis' && !relayActive}>卓球</button>
-				<button on:click={() => { relayActive = false; fetchTournament('soccer'); }} class:active={selectedSport === 'soccer' && !relayActive}>サッカー</button>
-				<button on:click={() => { relayActive = true; fetchRelayResults('A'); }} class:active={relayActive}>リレー</button>
+				<button on:click={() => { relayActive = false; fetchTournament('volleyball'); }} class:active={selectedSport === 'volleyball' && !relayActive} class="sports-btn">バレーボール</button>
+				<button on:click={() => { relayActive = false; fetchTournament('table_tennis'); }} class:active={selectedSport === 'table_tennis' && !relayActive} class="sports-btn">卓球</button>
+				<button on:click={() => { relayActive = false; fetchTournament('soccer'); }} class:active={selectedSport === 'soccer' && !relayActive} class="sports-btn">サッカー</button>
+				<button on:click={() => { relayActive = true; fetchRelayResults('A'); }} class:active={relayActive} class="sports-btn">リレー</button>
 				{#if (userRole === 'superroot' || (userRole === 'admin' && assignedSport === 'table_tennis')) && selectedSport === 'table_tennis' && !relayActive}
 				<div class="weather-switcher">
 					<span>卓球トーナメント天候:</span>
@@ -1029,7 +1029,150 @@
 </div>
 
 <style>
-	/* General */
+	/* ===== モダンUIベースCSS ===== */
+
+body {
+  font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+  background: #f7f8fa;
+  color: #222;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem 2rem 1rem 2rem;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+.dashboard-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.dashboard-tabs {
+  display: flex;
+  gap: 1.2rem;
+}
+.dashboard-tab-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #555;
+  padding: 0.5rem 1.2rem;
+  border-radius: 6px 6px 0 0;
+  transition: background 0.2s, color 0.2s;
+  cursor: pointer;
+}
+.dashboard-tab-btn.active, .dashboard-tab-btn:focus {
+  background: #e3e8f0;
+  color: #1976d2;
+}
+.logout-btn {
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.logout-btn:hover {
+  background: #b71c1c;
+}
+
+.sports-buttons {
+  display: flex;
+  gap: 1rem;
+  margin: 2rem 0 1.5rem 0;
+  justify-content: center;
+}
+.sports-btn {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  color: #1976d2;
+  font-weight: 600;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  padding: 0.7rem 1.5rem;
+  cursor: pointer;
+  transition: background 0.2s, border 0.2s, color 0.2s;
+}
+.sports-btn.active, .sports-btn:focus {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+.sports-btn:hover {
+  background: #e3e8f0;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem 1rem;
+}
+
+/* モーダル */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.13);
+  padding: 2.5rem 2rem;
+  width: 95vw;
+  max-width: 420px;
+  text-align: center;
+}
+.modal-actions {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+.modal-btn {
+  padding: 0.7rem 1.5rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.modal-btn.cancel {
+  background: #e0e0e0;
+  color: #333;
+}
+.modal-btn.ok {
+  background: #1976d2;
+  color: #fff;
+}
+.modal-btn.danger {
+  background: #e53935;
+  color: #fff;
+}
+.modal-btn.cancel:hover { background: #bdbdbd; }
+.modal-btn.ok:hover { background: #1565c0; }
+.modal-btn.danger:hover { background: #b71c1c; }
+
+/* Bracketry Global Styles */
+:global(.bracket-match-team) { background-color: #f0f0f0 !important; border: 1px solid #ccc !important; }
+:global(.bracket-match-winner .bracket-match-team) { background-color: #d4edda !important; font-weight: bold; }
+:global(.bracket-connector) { border-color: #999 !important; }
+
+/* General */
 	.dashboard-container { padding: 2rem; font-family: sans-serif; }
 	main { text-align: center; }
 	h1 { font-size: 2.5rem; margin-right: auto; }
@@ -1221,11 +1364,52 @@
 	}
 
 	/* Responsive */
-	@media (max-width: 768px) {
-		header { flex-direction: column; align-items: stretch; gap: 1rem; }
-		h1 { text-align: center; margin-right: 0; }
-		.dashboard-tabs { order: 2; width: 100%; display: flex; justify-content: center; }
-		.logout-btn { order: 3; margin-left: 0; width: 100%; }
-		.match-edit-form { flex-direction: column; align-items: stretch; }
-	}
+	@media (max-width: 900px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.2rem 1rem 0.7rem 1rem;
+  }
+  .dashboard-title {
+    font-size: 1.5rem;
+  }
+  .dashboard-tabs {
+    gap: 0.7rem;
+  }
+  .sports-buttons {
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  main {
+    padding: 1rem 0.5rem 2rem 0.5rem;
+  }
+  .modal-content {
+    padding: 1.2rem 0.5rem;
+    max-width: 98vw;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-header {
+    padding: 0.7rem 0.3rem 0.5rem 0.3rem;
+  }
+  .dashboard-title {
+    font-size: 1.1rem;
+  }
+  .dashboard-tabs {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .sports-buttons {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  main {
+    padding: 0.5rem 0.1rem 1rem 0.1rem;
+  }
+  .modal-content {
+    padding: 0.7rem 0.2rem;
+    max-width: 99vw;
+  }
+}
 </style>
