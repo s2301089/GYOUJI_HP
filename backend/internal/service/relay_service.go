@@ -11,6 +11,7 @@ import (
 type RelayService interface {
 	GetRelayRankings(block string) (map[int]int, error)
 	RegisterRelayRankings(block string, rankings map[int]int) error
+	ResetRelay(block string) error
 }
 
 type RelayServiceImpl struct {
@@ -61,6 +62,18 @@ func (s *RelayServiceImpl) RegisterRelayRankings(block string, rankings map[int]
 	}
 
 	return nil
+}
+
+func (s *RelayServiceImpl) ResetRelay(block string) error {
+	if block != "A" && block != "B" {
+		return errors.New("block must be 'A' or 'B'")
+	}
+
+	if err := s.repo.ResetRelay(block); err != nil {
+		return err
+	}
+
+	return s.repo.ResetBonusScores()
 }
 
 // validateRankings 順位データのバリデーション

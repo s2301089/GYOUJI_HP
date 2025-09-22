@@ -105,3 +105,57 @@ func (h *RelayHandler) RegisterRelayRankings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "relay rankings registered successfully"})
 }
+
+// ResetRelay リレーの指定されたブロックの順位をリセット
+// @Summary リレーブロックの順位リセット
+// @Description 指定されたブロック（A or B）のリレー順位をリセットします
+// @Tags relay
+// @Param body body model.RelayResetRequest true "リセットするブロック"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/relay/reset [post]
+// @Security     ApiKeyAuth
+func (h *RelayHandler) ResetRelay(c *gin.Context) {
+	// 認証チェック
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userMap, ok := user.(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	role, _ := userMap["role"].(string)
+
+	// 権限チェック（superrootのみ）
+	if role != "superroot" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: only superroot can reset relay rankings"})
+		return
+	}
+
+	var req model.RelayResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if req.Block == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "block parameter is required"})
+		return
+	}
+
+	err := h.service.ResetRelay(req.Block)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "relay rankings reset successfully"})
+}

@@ -71,6 +71,7 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 		// リレー関連
 		api.GET("/relay", relayHandler.GetRelayRankings)
 		api.POST("/relay", middleware.AuthMiddleware(jwtSecret), relayHandler.RegisterRelayRankings)
+		api.POST("/relay/reset", middleware.AuthMiddleware(jwtSecret), relayHandler.ResetRelay)
 
 		// 出席点関連（superrootのみ）
 		api.GET("/attendance", middleware.AuthMiddleware(jwtSecret), attendanceHandler.GetAttendanceScores)

@@ -63,6 +63,8 @@
 	let relayLoading = false;
 	let relayError = '';
 	let relayUpdateStatus = ''; // 'success' | 'error' | ''
+	let showRelayResetConfirmModal = false;
+	let resettingRelayType = '';
 
 
 	// --- Lifecycle & Initialisation ---
@@ -500,6 +502,42 @@
 		setTimeout(() => { relayUpdateStatus = ''; }, 3000);
 	}
 
+	function openRelayResetModal(block) {
+		resettingRelayType = block;
+		showRelayResetConfirmModal = true;
+	}
+
+	async function handleRelayReset() {
+		if (!resettingRelayType) return;
+
+		relayUpdateStatus = 'loading';
+		try {
+			const res = await fetch('/api/relay/reset', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ block: resettingRelayType })
+			});
+
+			if (res.ok) {
+				relayUpdateStatus = 'success';
+				await fetchRelayResults(resettingRelayType);
+			} else {
+				const errorData = await res.json();
+				alert(`リセットに失敗しました: ${errorData.error}`);
+				relayUpdateStatus = 'error';
+			}
+		} catch (e) {
+			console.error('Relay reset error:', e);
+			alert('サーバーとの通信に失敗しました。');
+			relayUpdateStatus = 'error';
+		}
+
+		showRelayResetConfirmModal = false;
+		resettingRelayType = '';
+		setTimeout(() => { relayUpdateStatus = ''; }, 3000);
+	}
+
 	// 出席点関連の関数
 	async function fetchAttendanceScores() {
 		attendanceLoading = true;
@@ -880,19 +918,24 @@
 									</div>
 								{/each}
 							</section>
-							<button 
-								on:click={updateRelayRanks} 
-								class="update-btn" 
-								disabled={relayUpdateStatus === 'loading'}
-							>
-								{relayUpdateStatus === 'loading' ? '更新中...' : 'リレー結果を更新'}
-							</button>
+							<div class="relay-actions">
+								<button 
+									on:click={updateRelayRanks} 
+									class="update-btn" 
+									disabled={relayUpdateStatus === 'loading'}
+								>
+									{relayUpdateStatus === 'loading' ? '更新中...' : 'リレー結果を更新'}
+								</button>
+								{#if userRole === 'superroot'}
+									<button on:click={() => openRelayResetModal(relayType)} class="reset-btn">リセット</button>
+								{/if}
+							</div>
 							{#if relayUpdateStatus === 'success'}
 								<span class="update-status success">更新しました！</span>
 							{:else if relayUpdateStatus === 'error'}
-								<span class="update-status error">更新に失敗しました。</span>
+								<span class="update-status error">失敗しました。</span>
 							{:else if relayUpdateStatus === 'loading'}
-								<span class="update-status loading">更新中...</span>
+								<span class="update-status loading">処理中...</span>
 							{/if}
 						{:else}
 							<p>リレーデータがありません。</p>
@@ -952,6 +995,19 @@
 		</div>
 	{/if}
 
+	{#if showRelayResetConfirmModal}
+		<div class="modal-overlay" on:click={() => showRelayResetConfirmModal = false}>
+			<div class="modal-content" on:click|stopPropagation>
+				<h3>リレー{resettingRelayType}ブロックの結果をリセットしますか？</h3>
+				<p>この操作は元に戻せません。本当にこのブロックの結果をリセットしてよろしいですか？</p>
+				<div class="modal-actions">
+					<button class="cancel-btn" on:click={() => { showRelayResetConfirmModal = false; resettingRelayType = ''; }}>キャンセル</button>
+					<button on:click={handleRelayReset} class="reset-btn">リセット</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	{#if showResetConfirmModal}
 		<div class="modal-overlay" on:click={() => showResetConfirmModal = false}>
 			<div class="modal-content" on:click|stopPropagation>
@@ -980,7 +1036,7 @@
 	button:hover { opacity: 0.9; }
 	.update-btn { 
 		background: #4285f4; 
-		margin-top: 1.5rem; 
+		/* margin-top: 1.5rem;  */
 		transition: all 0.2s ease;
 	}
 	.reset-btn {
@@ -1136,6 +1192,7 @@
 	}
 	.rank-badge { font-weight: bold; font-size: 1rem; color: #fff; background-color: #6c757d; border-radius: 4px; padding: 0.3rem 0.6rem; margin-right: 1rem; }
 	.class-name { font-size: 1.1rem; }
+	.relay-actions { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
 
 	/* Modal */
 	.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }

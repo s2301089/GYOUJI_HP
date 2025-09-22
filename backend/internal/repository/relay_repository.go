@@ -204,3 +204,31 @@ func (r *RelayRepository) getRepresentativeClassID(grade int) int {
 	}
 	return 0
 }
+
+func (r *RelayRepository) ResetRelay(block string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 該当ブロックのリレー得点をリセット
+	scoreColumn := fmt.Sprintf("relay_%s_score", block)
+	_, err = tx.Exec(fmt.Sprintf("UPDATE team_points SET %s = 0", scoreColumn))
+	if err != nil {
+		return err
+	}
+
+	// 該当ブロックのrelay_resultsをリセット
+	_, err = tx.Exec("UPDATE relay_results SET class_id = 0 WHERE relay_type = ?", block)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *RelayRepository) ResetBonusScores() error {
+	_, err := r.DB.Exec("UPDATE team_points SET relay_bonus_score = 0")
+	return err
+}

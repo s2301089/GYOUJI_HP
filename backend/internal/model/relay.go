@@ -22,22 +22,22 @@ type RelayRankResponse struct {
 // RelayResult リレー結果（内部処理用）
 type RelayResult struct {
 	ID        int       `json:"id"`
-	Block     string    `json:"block"`     // "A" or "B"
-	Rank      int       `json:"rank"`      // 1-6
-	Grade     int       `json:"grade"`     // 学年 (1-5, 6=専・教)
-	Score     int       `json:"score"`     // 獲得得点
+	Block     string    `json:"block"` // "A" or "B"
+	Rank      int       `json:"rank"`  // 1-6
+	Grade     int       `json:"grade"` // 学年 (1-5, 6=専・教)
+	Score     int       `json:"score"` // 獲得得点
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // GradeScore 学年別得点集計
 type GradeScore struct {
-	Grade      int `json:"grade"`       // 学年
+	Grade       int `json:"grade"`         // 学年
 	BlockAScore int `json:"block_a_score"` // Aブロック得点
 	BlockBScore int `json:"block_b_score"` // Bブロック得点
-	TotalScore int `json:"total_score"`   // 合計得点
-	FinalRank  int `json:"final_rank"`    // 最終順位
-	BonusScore int `json:"bonus_score"`   // ボーナス得点
+	TotalScore  int `json:"total_score"`   // 合計得点
+	FinalRank   int `json:"final_rank"`    // 最終順位
+	BonusScore  int `json:"bonus_score"`   // ボーナス得点
 }
 
 // RelayScoreConfig リレー得点設定
@@ -65,4 +65,8 @@ var GradeToClassIDs = map[int][]int{
 	4: {41, 42, 43}, // 4年生: IS4, IT4, IE4
 	5: {51, 52, 53}, // 5年生: IS5, IT5, IE5
 	6: {6},          // 専・教: 専・教
+}
+
+type RelayResetRequest struct {
+	Block string `json:"block" binding:"required"`
 }
