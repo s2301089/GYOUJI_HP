@@ -1,3 +1,7 @@
+<svelte:head>
+  <title>行事委員会結果速報アプリ</title>
+</svelte:head>
+
 <!-- Hero Section -->
 <section id="home" class="hero">
   <h1>仙台高専広瀬キャンパス 行事委員会</h1>

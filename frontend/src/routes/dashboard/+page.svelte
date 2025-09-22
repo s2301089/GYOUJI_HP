@@ -646,6 +646,10 @@
 
 </script>
 
+<svelte:head>
+	<title>行事委員会結果速報アプリ</title>
+</svelte:head>
+
 <div class="dashboard-container">
 	<header>
 		<h1>ダッシュボード</h1>
