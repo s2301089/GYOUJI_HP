@@ -17,7 +17,7 @@ func TableTennisAdminOnly() gin.HandlerFunc {
 		}
 
 		userRole := role.(string)
-		if userRole == "superroot" {
+		if userRole == "superroot" || userRole == "admin_table_tennis" {
 			c.Next()
 			return
 		}
