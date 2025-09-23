@@ -333,7 +333,7 @@
 		if (tableTennisWeather === 'sunny') {
 			return allTableTennisMatches.filter(m => m.tournament_name === '卓球（晴天時）');
 		}
-		return allTableTennisMatches.filter(m => m.tournament_name.startsWith('卓球（雨天時）'));
+		return allTableTennisMatches.filter(m => m.tournament_name.includes('雨天時'));
 	}
 
 	function getFilteredTableTennisTournaments() {
