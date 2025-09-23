@@ -1,6 +1,9 @@
 package router
 
 import (
+	"os"
+	"strings"
+
 	"github.com/saku0512/GYOUJI_HP/backend/internal/handler"
 	"github.com/saku0512/GYOUJI_HP/backend/internal/middleware"
 
@@ -9,15 +12,45 @@ import (
 	_ "github.com/saku0512/GYOUJI_HP/backend/docs"
 )
 
+// securityHeadersMiddleware は、推奨されるセキュリティヘッダーをレスポンスに追加します。
+func securityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("X-Frame-Options", "DENY")
+		c.Writer.Header().Set("X-Content-Type-Options", "nosniff")
+		c.Writer.Header().Set("X-XSS-Protection", "1; mode=block")
+		c.Next()
+	}
+}
+
 // SetupRouter は Gin のルーターをセットアップし、ルートを定義します。
 func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.TournamentHandler, matchHandler *handler.MatchHandler, jwtSecret string, scoreHandler *handler.ScoreHandler, relayHandler *handler.RelayHandler, attendanceHandler *handler.AttendanceHandler, settingHandler *handler.SettingHandler) *gin.Engine {
 	r := gin.Default()
 
+	// セキュリティヘッダーミドルウェアを適用
+	r.Use(securityHeadersMiddleware())
+
 	// CORSミドルウェアの設定
-	// httpOnly cookie を使うため、Allow-Originを特定し、Allow-Credentialsをtrueにする
 	r.Use(func(c *gin.Context) {
-		// TODO: 本番環境のフロントエンドのオリジンに合わせて変更する
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+		allowedOriginsStr := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if allowedOriginsStr == "" {
+			// 環境変数が設定されていない場合は、開発用のデフォルト値を使用
+			allowedOriginsStr = "http://localhost:5173,http://localhost:3300"
+		}
+		allowedOrigins := strings.Split(allowedOriginsStr, ",")
+
+		origin := c.Request.Header.Get("Origin")
+		isAllowed := false
+		for _, allowedOrigin := range allowedOrigins {
+			if origin == strings.TrimSpace(allowedOrigin) {
+				isAllowed = true
+				break
+			}
+		}
+
+		if isAllowed {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-control-allow-methods", "POST, OPTIONS, GET, PUT, DELETE")
