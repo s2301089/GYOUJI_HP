@@ -5,8 +5,6 @@ import (
 	"github.com/saku0512/GYOUJI_HP/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 
 	_ "github.com/saku0512/GYOUJI_HP/backend/docs"
 )
@@ -31,9 +29,6 @@ func SetupRouter(userHandler *handler.UserHandler, tournamentHandler *handler.To
 
 		c.Next()
 	})
-
-	// Swagger UI
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := r.Group("/api")
 	{
