@@ -71,7 +71,7 @@
 #### 必須ソフトウェア
 - **Docker & Docker Compose**
   - [Docker Desktop](https://www.docker.com/products/docker-desktop/) をインストール
-  - インストール後、`docker --version` と `docker compose --version` でバージョンを確認
+  - インストール後、`docker --version` と `docker compose version` でバージョンを確認
 
 - **Node.js & npm**
   - [Node.js](https://nodejs.org/) (推奨: LTS版)
