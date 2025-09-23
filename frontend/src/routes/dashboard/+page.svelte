@@ -822,7 +822,7 @@
 														<input type="number" min="0" bind:value={m.team2_score} class="score-input" required />
 														<span>{m.team2_name}</span>
 													</div>
-													<button type="submit" class="update-btn">更新</button>
+													<button type="submit" class="update-btn" disabled={!m.team1_name || !m.team2_name}>更新</button>
 													{#if userRole === 'superroot'}
 														<button type="button" class="reset-btn" on:click={() => { showResetConfirmModal = true; resettingMatch = m; editingSport = sport; }}>リセット</button>
 													{/if}
@@ -863,7 +863,7 @@
 														<input type="number" min="0" bind:value={m.team2_score} class="score-input" required />
 														<span>{m.team2_name}</span>
 													</div>
-													<button type="submit" class="update-btn">更新</button>
+													<button type="submit" class="update-btn" disabled={!m.team1_name || !m.team2_name}>更新</button>
 													{#if userRole === 'superroot'}
 														<button type="button" class="reset-btn" on:click={() => { showResetConfirmModal = true; resettingMatch = m; editingSport = sport; }}>リセット</button>
 													{/if}
